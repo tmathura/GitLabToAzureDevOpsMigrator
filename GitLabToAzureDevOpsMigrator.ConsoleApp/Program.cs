@@ -1,9 +1,14 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Implementations;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
+using GitLabToAzureDevOpsMigrator.Domain.Models;
+using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NGitLab;
+using NGitLab.Impl;
 using RestSharp;
 using System.Diagnostics;
 using System.Reflection;
@@ -14,36 +19,38 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
     {
         private static ILog Logger { get; } = LogManager.GetLogger(MethodBase.GetCurrentMethod()?.DeclaringType);
 
-        private static async Task Main(string[] args)
+        private static async Task Main()
         {
+            var configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
+
+            var appSettings = new AppSettings();
+            configuration.Bind(appSettings);
+
             var repository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             var fileInfo = new FileInfo("log4net.config");
             log4net.Config.XmlConfigurator.Configure(repository, fileInfo);
 
-            const string gitLabUrl = "https://gitlab.com";
-            const string gitLabAccessToken = "";
-
-            var restClient = new RestClient($"{gitLabUrl}/api/v4");
-            restClient.AddDefaultHeader("PRIVATE-TOKEN", gitLabAccessToken);
+            var restClient = new RestClient($"{appSettings.GitLab.Url}/{appSettings.GitLab.ApiPath}");
+            restClient.AddDefaultHeader("PRIVATE-TOKEN", appSettings.GitLab.AccessToken);
 
             var serviceProvider = new ServiceCollection()
+                .AddSingleton<IConfiguration, ConfigurationRoot>(_ => (ConfigurationRoot)configuration)
                 .AddSingleton<IRestClient, RestClient>(_ => restClient)
                 .AddSingleton<IProjectService, ProjectService>()
-                .AddSingleton<IMigratorBl, MigratorBl>()
+                .AddSingleton<IGitLabClient, GitLabClient>(_ => new GitLabClient(appSettings.GitLab.Url, appSettings.GitLab.AccessToken))
+                .AddSingleton<IProjectIssueNoteClient, ProjectIssueNoteClient>(services => (ProjectIssueNoteClient)services.GetRequiredService<IGitLabClient>().GetProjectIssueNoteClient(appSettings.GitLab.ProjectId))
+                .AddSingleton<IGitLabIssueBl, GitLabIssueBl>()
+                .AddSingleton<IMigrateBl, MigrateBl>()
                 .BuildServiceProvider();
+
             try
             {
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
 
-                var migratorBl = serviceProvider.GetService<IMigratorBl>();
+                var migrateBl = serviceProvider.GetRequiredService<IMigrateBl>();
 
-                if (migratorBl == null)
-                {
-                    throw new Exception("The console app migrator is null.");
-                }
-
-                await migratorBl.CollectGitLabIssues(gitLabUrl, 0, 0, gitLabAccessToken);
+                await migrateBl.Migrate();
 
                 stopwatch.Stop();
 
@@ -56,7 +63,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             catch (Exception exception)
             {
                 Logger.Error(exception.Message, exception);
-                Console.WriteLine("An exception occurred, check the logs for information.");
+                Console.WriteLine($"{Environment.NewLine}An exception occurred, check the logs for information.");
                 Console.WriteLine(exception.Message);
             }
 

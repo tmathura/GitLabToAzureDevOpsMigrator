@@ -3,39 +3,35 @@ using GitLabToAzureDevOpsMigrator.Domain.Models;
 using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
+using Microsoft.Extensions.Configuration;
 using NGitLab;
 using NGitLab.Models;
 using System.Text.RegularExpressions;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 {
-    public class MigratorBl : IMigratorBl
+    public class GitLabIssueBl : IGitLabIssueBl
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IProjectService ProjectService { get; }
+        public IGitLabClient GitLabClient { get; }
+        public IProjectIssueNoteClient ProjectIssueNoteClient { get; }
+        private GitLabSettings GitLabSettings { get; }
 
-        public MigratorBl(IProjectService projectService)
+        public GitLabIssueBl(IConfiguration configuration, IGitLabClient gitLabClient, IProjectIssueNoteClient projectIssueNoteClient, IProjectService projectService)
         {
+            var appSettings = new AppSettings();
+            configuration.Bind(appSettings);
+
+            GitLabSettings = appSettings.GitLab;
+            GitLabClient = gitLabClient;
+            ProjectIssueNoteClient = projectIssueNoteClient;
             ProjectService = projectService;
         }
-
-        public void MigrateEpics(string gitLabUrl, int gitLabGroupId, int gitLabProjectId, string gitLabToken)
-        {
-            var client = new GitLabClient(gitLabUrl, gitLabToken);
-
-            var epics = client.Epics.Get(gitLabGroupId, new EpicQuery()).ToList();
-
-            Console.WriteLine(epics.Count == 0 ? "No epics found." : $"There are {epics.Count} epics.");
-
-            foreach (var epic in epics)
-            {
-                Console.WriteLine($"This is epic {epic.EpicIid} - '{epic.Title}'");
-            }
-        }
         
-        public async Task CollectGitLabIssues(string gitLabUrl, int gitLabGroupId, int gitLabProjectId, string gitLabAccessToken)
+        public async Task CollectIssues()
         {
-            var statisticsRoot = await ProjectService.GetIssuesStatistics(gitLabProjectId, new List<string> { "team::Core" });
+            var statisticsRoot = await ProjectService.GetIssuesStatistics(GitLabSettings.ProjectId, new List<string> { "team::Core" });
 
             if (statisticsRoot == null)
             {
@@ -54,15 +50,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
 
-            var client = new GitLabClient(gitLabUrl, gitLabAccessToken);
-            var project = await client.Projects.GetByIdAsync(gitLabProjectId, new SingleProjectQuery());
-            var projectIssueNoteClient = client.GetProjectIssueNoteClient(gitLabProjectId);
+            var project = await GitLabClient.Projects.GetByIdAsync(GitLabSettings.ProjectId, new SingleProjectQuery());
 
             var issueWebUri = new Uri(project.WebUrl);
             var projectUrl = $"{issueWebUri.Scheme}://{issueWebUri.Host}";
             var projectUrlSegments = $"/{issueWebUri.Segments[1]}{issueWebUri.Segments[2]}".TrimEnd('/');
 
-            var issues = client.Issues.GetAsync(gitLabProjectId, new IssueQuery { Labels = "team::Core" });
+            var issues = GitLabClient.Issues.GetAsync(GitLabSettings.ProjectId, new IssueQuery { Labels = "team::Core" });
 
             var count = 0;
             var gitLabIssues = new List<FullIssueDetails>();
@@ -76,7 +70,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                 await semaphore.WaitAsync(); // Wait until the semaphore is available
 
-                tasks.Add(ProcessIssueAsync(issue, gitLabProjectId, projectIssueNoteClient, client, projectUrl, projectUrlSegments, gitLabIssues, count, allIssuesCount, semaphore));
+                tasks.Add(ProcessIssueAsync(issue, projectUrl, projectUrlSegments, gitLabIssues, count, allIssuesCount, semaphore));
             }
 
             var processedResults = await Task.WhenAll(tasks);
@@ -90,7 +84,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Logger.Info(endingProcessMessage);
         }
 
-        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, int gitLabProjectId, IProjectIssueNoteClient projectIssueNoteClient, IGitLabClient client, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails> gitLabIssues, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails> gitLabIssues, int count, int allIssuesCount, SemaphoreSlim semaphore)
         {
             var processIssueResult = new ProcessIssueResult();
 
@@ -100,7 +94,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                 GetAttachmentInString(issue.Description, projectUrl, projectUrlSegments, gitLabIssue.IssueAttachments);
 
-                var notes = projectIssueNoteClient.ForIssue(issue.IssueId);
+                var notes = ProjectIssueNoteClient.ForIssue(issue.IssueId);
 
                 foreach (var note in notes)
                 {
@@ -109,7 +103,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                     GetAttachmentInString(note.Body, projectUrl, projectUrlSegments, gitLabIssue.NotesAttachments);
                 }
 
-                var relatedIssues = client.Issues.LinkedToAsync(gitLabProjectId, issue.IssueId);
+                var relatedIssues = GitLabClient.Issues.LinkedToAsync(GitLabSettings.ProjectId, issue.IssueId);
 
                 await foreach (var relatedIssue in relatedIssues)
                 {
