@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Models\GitLab\Assignee.cs" />
+    <Compile Remove="Models\GitLab\Author.cs" />
+    <Compile Remove="Models\GitLab\Issue.cs" />
+    <Compile Remove="Models\GitLab\Links.cs" />
+    <Compile Remove="Models\GitLab\Milestone.cs" />
+    <Compile Remove="Models\GitLab\References.cs" />
+    <Compile Remove="Models\GitLab\TaskCompletionStatus.cs" />
+    <Compile Remove="Models\GitLab\TimeStats.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="NGitLab" Version="6.42.0" />
+  </ItemGroup>
+
+</Project>
