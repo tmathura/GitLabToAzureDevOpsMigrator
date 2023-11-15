@@ -1,7 +1,6 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Implementations;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
-using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
