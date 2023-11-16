@@ -59,7 +59,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             var issues = GitLabClient.Issues.GetAsync(GitLabSettings.ProjectId, new IssueQuery { Labels = "team::Core" });
 
             var count = 0;
-            var gitLabIssues = new List<FullIssueDetails>();
+            var fullIssueDetailsList = new List<FullIssueDetails>();
 
             var semaphore = new SemaphoreSlim(10); // Set the maximum number of parallel tasks
             var tasks = new List<Task<ProcessIssueResult>>();
@@ -70,7 +70,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                 await semaphore.WaitAsync(); // Wait until the semaphore is available
 
-                tasks.Add(ProcessIssueAsync(issue, projectUrl, projectUrlSegments, gitLabIssues, count, allIssuesCount, semaphore));
+                tasks.Add(ProcessIssueAsync(issue, projectUrl, projectUrlSegments, fullIssueDetailsList, count, allIssuesCount, semaphore));
             }
 
             var processedResults = await Task.WhenAll(tasks);
@@ -84,33 +84,39 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Logger.Info(endingProcessMessage);
         }
 
-        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails> gitLabIssues, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails> fullIssueDetailsCollection, int count, int allIssuesCount, SemaphoreSlim semaphore)
         {
             var processIssueResult = new ProcessIssueResult();
 
             try
             {
-                var gitLabIssue = new FullIssueDetails(issue, new List<Attachment>(), new List<ProjectIssueNote>(), new List<Attachment>(), new List<Issue>());
+                var fullIssueDetails = new FullIssueDetails(issue, new List<Attachment>(), new List<ProjectIssueNote>(), new List<Attachment>(), new List<Issue>());
 
-                GetAttachmentInString(issue.Description, projectUrl, projectUrlSegments, gitLabIssue.IssueAttachments);
+                if (!string.IsNullOrWhiteSpace(issue.Description))
+                {
+                    GetAttachmentInString(issue.Description, projectUrl, projectUrlSegments, fullIssueDetails.IssueAttachments);
+                }
 
                 var notes = ProjectIssueNoteClient.ForIssue(issue.IssueId);
 
                 foreach (var note in notes)
                 {
-                    gitLabIssue.Notes.Add(note);
+                    fullIssueDetails.Notes.Add(note);
 
-                    GetAttachmentInString(note.Body, projectUrl, projectUrlSegments, gitLabIssue.NotesAttachments);
+                    if (!string.IsNullOrWhiteSpace(note.Body))
+                    {
+                        GetAttachmentInString(note.Body, projectUrl, projectUrlSegments, fullIssueDetails.NotesAttachments);
+                    }
                 }
 
                 var relatedIssues = GitLabClient.Issues.LinkedToAsync(GitLabSettings.ProjectId, issue.IssueId);
 
                 await foreach (var relatedIssue in relatedIssues)
                 {
-                    gitLabIssue.RelatedIssues.Add(relatedIssue);
+                    fullIssueDetails.RelatedIssues.Add(relatedIssue);
                 }
                 
-                gitLabIssues.Add(gitLabIssue);
+                fullIssueDetailsCollection.Add(fullIssueDetails);
 
                 DrawConsoleProgressBar(count, allIssuesCount);
 
