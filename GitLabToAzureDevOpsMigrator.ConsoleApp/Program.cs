@@ -1,4 +1,6 @@
-﻿using GitLabToAzureDevOpsMigrator.Core.Implementations;
+﻿using GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.Implementations;
+using GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.Interfaces;
+using GitLabToAzureDevOpsMigrator.Core.Implementations;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations;
@@ -6,6 +8,7 @@ using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.VisualStudio.Services.Common;
 using NGitLab;
 using NGitLab.Impl;
 using RestSharp;
@@ -32,6 +35,8 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             var restClient = new RestClient($"{appSettings.GitLab.Url}/{appSettings.GitLab.ApiPath}");
             restClient.AddDefaultHeader("PRIVATE-TOKEN", appSettings.GitLab.AccessToken);
 
+            var vssBasicCredential = new VssBasicCredential(appSettings.AzureDevOps.AccessToken, string.Empty);
+            
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IConfiguration, ConfigurationRoot>(_ => (ConfigurationRoot)configuration)
                 .AddSingleton<IRestClient, RestClient>(_ => restClient)
@@ -39,6 +44,8 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 .AddSingleton<IGitLabClient, GitLabClient>(_ => new GitLabClient(appSettings.GitLab.Url, appSettings.GitLab.AccessToken))
                 .AddSingleton<IProjectIssueNoteClient, ProjectIssueNoteClient>(services => (ProjectIssueNoteClient)services.GetRequiredService<IGitLabClient>().GetProjectIssueNoteClient(appSettings.GitLab.ProjectId))
                 .AddSingleton<IGitLabIssueBl, GitLabIssueBl>()
+                .AddSingleton<IVssConnection, VssConnectionWrapper>(_ => new VssConnectionWrapper(new Uri(appSettings.AzureDevOps.Url), vssBasicCredential))
+                .AddSingleton<IAzureDevOpsWorkItemBl, AzureDevOpsWorkItemBl>()
                 .AddSingleton<IMigrateBl, MigrateBl>()
                 .BuildServiceProvider();
 

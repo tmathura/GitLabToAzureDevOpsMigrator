@@ -5,15 +5,18 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
     public class MigrateBl : IMigrateBl
     {
         private IGitLabIssueBl GitLabIssueBl { get; }
+        private IAzureDevOpsWorkItemBl AzureDevOpsWorkItemBl { get; }
 
-        public MigrateBl(IGitLabIssueBl gitLabIssueBl)
+        public MigrateBl(IGitLabIssueBl gitLabIssueBl, IAzureDevOpsWorkItemBl azureDevOpsWorkItemBl)
         {
             GitLabIssueBl = gitLabIssueBl;
+            AzureDevOpsWorkItemBl = azureDevOpsWorkItemBl;
         }
         
         public async Task Migrate()
         {
-            await GitLabIssueBl.CollectIssues();
+            var fullIssueDetailsList = await GitLabIssueBl.CollectIssues();
+            var workItems = await AzureDevOpsWorkItemBl.GetAllWorkItems();
         }
     }
 }

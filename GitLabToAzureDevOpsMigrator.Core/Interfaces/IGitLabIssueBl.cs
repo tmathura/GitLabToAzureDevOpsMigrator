@@ -1,6 +1,8 @@
-﻿namespace GitLabToAzureDevOpsMigrator.Core.Interfaces;
+﻿using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
+
+namespace GitLabToAzureDevOpsMigrator.Core.Interfaces;
 
 public interface IGitLabIssueBl
 {
-    Task CollectIssues();
+    Task<List<FullIssueDetails>?> CollectIssues();
 }

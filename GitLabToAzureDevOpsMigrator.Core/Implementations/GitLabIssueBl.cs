@@ -29,7 +29,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             ProjectService = projectService;
         }
         
-        public async Task CollectIssues()
+        public async Task<List<FullIssueDetails>?> CollectIssues()
         {
             var statisticsRoot = await ProjectService.GetIssuesStatistics(GitLabSettings.ProjectId, new List<string> { "team::Core" });
 
@@ -40,7 +40,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 Console.WriteLine(noStatisticsMessage);
                 Logger.Info(noStatisticsMessage);
 
-                return;
+                return null;
             }
 
             var allIssuesCount = statisticsRoot.Statistics.Counts.All;
@@ -82,9 +82,11 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
             Console.WriteLine(endingProcessMessage);
             Logger.Info(endingProcessMessage);
+
+            return fullIssueDetailsList;
         }
 
-        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails> fullIssueDetailsCollection, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails>? fullIssueDetailsCollection, int count, int allIssuesCount, SemaphoreSlim semaphore)
         {
             var processIssueResult = new ProcessIssueResult();
 

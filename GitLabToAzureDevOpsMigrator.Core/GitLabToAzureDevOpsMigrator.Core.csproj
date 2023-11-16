@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper\GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.csproj" />
     <ProjectReference Include="..\GitLabToAzureDevOpsMigrator.Domain\GitLabToAzureDevOpsMigrator.Domain.csproj" />
     <ProjectReference Include="..\GitLabToAzureDevOpsMigrator.GitLabWrapper\GitLabToAzureDevOpsMigrator.GitLabWrapper.csproj" />
   </ItemGroup>
