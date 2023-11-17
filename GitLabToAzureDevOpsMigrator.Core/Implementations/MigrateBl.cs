@@ -15,8 +15,11 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
         
         public async Task Migrate()
         {
-            var fullIssueDetailsList = await GitLabIssueBl.CollectIssues();
-            var workItems = await AzureDevOpsWorkItemBl.GetAllWorkItems();
+            var tickets = await GitLabIssueBl.CollectIssues();
+            if (tickets != null)
+            {
+                var workItems = await AzureDevOpsWorkItemBl.CreateWorkItems(tickets);
+            }
         }
     }
 }

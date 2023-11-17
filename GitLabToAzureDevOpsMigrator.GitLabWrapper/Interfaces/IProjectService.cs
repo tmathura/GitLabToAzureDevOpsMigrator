@@ -4,5 +4,5 @@ namespace GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 
 public interface IProjectService
 {
-    Task<StatisticsRoot?> GetIssuesStatistics(int projectId, List<string> labels);
+    Task<StatisticsRoot?> GetIssuesStatistics(int projectId, string label);
 }

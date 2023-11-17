@@ -1,6 +1,6 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
-using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
+using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
 using Microsoft.Extensions.Configuration;
@@ -29,9 +29,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             ProjectService = projectService;
         }
         
-        public async Task<List<FullIssueDetails>?> CollectIssues()
+        public async Task<List<Ticket>?> CollectIssues()
         {
-            var statisticsRoot = await ProjectService.GetIssuesStatistics(GitLabSettings.ProjectId, new List<string> { "team::Core" });
+            var statisticsRoot = await ProjectService.GetIssuesStatistics(GitLabSettings.ProjectId, GitLabSettings.LabelToMigrate);
 
             if (statisticsRoot == null)
             {
@@ -50,16 +50,12 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
 
-            var project = await GitLabClient.Projects.GetByIdAsync(GitLabSettings.ProjectId, new SingleProjectQuery());
+            var projectUrlSegments = $"/{GitLabSettings.GroupName}/{GitLabSettings.ProjectName}";
 
-            var issueWebUri = new Uri(project.WebUrl);
-            var projectUrl = $"{issueWebUri.Scheme}://{issueWebUri.Host}";
-            var projectUrlSegments = $"/{issueWebUri.Segments[1]}{issueWebUri.Segments[2]}".TrimEnd('/');
-
-            var issues = GitLabClient.Issues.GetAsync(GitLabSettings.ProjectId, new IssueQuery { Labels = "team::Core" });
+            var issues = GitLabClient.Issues.GetAsync(GitLabSettings.ProjectId, new IssueQuery { Labels = GitLabSettings.LabelToMigrate });
 
             var count = 0;
-            var fullIssueDetailsList = new List<FullIssueDetails>();
+            var tickets = new List<Ticket>();
 
             var semaphore = new SemaphoreSlim(10); // Set the maximum number of parallel tasks
             var tasks = new List<Task<ProcessIssueResult>>();
@@ -70,7 +66,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                 await semaphore.WaitAsync(); // Wait until the semaphore is available
 
-                tasks.Add(ProcessIssueAsync(issue, projectUrl, projectUrlSegments, fullIssueDetailsList, count, allIssuesCount, semaphore));
+                tasks.Add(ProcessIssueAsync(issue, projectUrlSegments, tickets, count, allIssuesCount, semaphore));
             }
 
             var processedResults = await Task.WhenAll(tasks);
@@ -83,31 +79,33 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Console.WriteLine(endingProcessMessage);
             Logger.Info(endingProcessMessage);
 
-            return fullIssueDetailsList;
+            return tickets;
         }
 
-        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrl, string projectUrlSegments, ICollection<FullIssueDetails>? fullIssueDetailsCollection, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrlSegments, ICollection<Ticket> tickets, int count, int allIssuesCount, SemaphoreSlim semaphore)
         {
             var processIssueResult = new ProcessIssueResult();
 
             try
             {
-                var fullIssueDetails = new FullIssueDetails(issue, new List<Attachment>(), new List<ProjectIssueNote>(), new List<Attachment>(), new List<Issue>());
+                var ticket = new Ticket(issue, null, new List<Attachment>(), new List<CommentNote>(), new List<Issue>());
 
                 if (!string.IsNullOrWhiteSpace(issue.Description))
                 {
-                    GetAttachmentInString(issue.Description, projectUrl, projectUrlSegments, fullIssueDetails.IssueAttachments);
+                    GetAttachmentInString(issue.Description, projectUrlSegments, ticket.IssueAttachments);
                 }
 
                 var notes = ProjectIssueNoteClient.ForIssue(issue.IssueId);
 
                 foreach (var note in notes)
                 {
-                    fullIssueDetails.Notes.Add(note);
+                    var commentNote = new CommentNote(note, new List<Attachment>(), null);
+
+                    ticket.CommentNotes.Add(commentNote);
 
                     if (!string.IsNullOrWhiteSpace(note.Body))
                     {
-                        GetAttachmentInString(note.Body, projectUrl, projectUrlSegments, fullIssueDetails.NotesAttachments);
+                        GetAttachmentInString(note.Body, projectUrlSegments, commentNote.NotesAttachments);
                     }
                 }
 
@@ -115,10 +113,10 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                 await foreach (var relatedIssue in relatedIssues)
                 {
-                    fullIssueDetails.RelatedIssues.Add(relatedIssue);
+                    ticket.RelatedIssues.Add(relatedIssue);
                 }
                 
-                fullIssueDetailsCollection.Add(fullIssueDetails);
+                tickets.Add(ticket);
 
                 DrawConsoleProgressBar(count, allIssuesCount);
 
@@ -140,7 +138,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             return processIssueResult;
         }
 
-        private static void GetAttachmentInString(string stringToExtractAttachment, string projectUrl, string projectUrlSegments, ICollection<Attachment> attachments)
+        private static void GetAttachmentInString(string stringToExtractAttachment, string projectUrlSegments, ICollection<Attachment> attachments)
         {
             const string attachmentPattern = @"\[([^\]]*)\]\(([^)]*)\)";
 
@@ -151,7 +149,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             foreach (var match in matches.Cast<Match>())
             {
                 var urlPath = match.Groups[2].Value;
-                var attachment = new Attachment(match.Groups[1].Value, urlPath, GetAttachmentUri(projectUrl, projectUrlSegments, urlPath));
+                var attachment = new Attachment(match.Groups[1].Value, urlPath, urlPath.Replace(projectUrlSegments, string.Empty), null);
 
                 attachments.Add(attachment);
             }
@@ -170,13 +168,6 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Console.BackgroundColor = ConsoleColor.Black;
             Console.Write(new string(' ', progressBarLength - filledLength));
             Console.Write($"] {progress * 100 / total}%");
-        }
-
-        private static Uri GetAttachmentUri(string projectUrl, string projectUrlSegments, string attachmentUrlPath)
-        {
-            var attachmentUrl = attachmentUrlPath.Contains(projectUrlSegments) ? $"{projectUrl}{attachmentUrlPath}" : $"{projectUrl}{projectUrlSegments}{attachmentUrlPath}";
-
-            return new Uri(attachmentUrl);
         }
     }
 }

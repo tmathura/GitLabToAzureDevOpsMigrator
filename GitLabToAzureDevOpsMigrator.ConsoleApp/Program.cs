@@ -2,7 +2,7 @@
 using GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Implementations;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
-using GitLabToAzureDevOpsMigrator.Domain.Models;
+using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
@@ -32,7 +32,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             var fileInfo = new FileInfo("log4net.config");
             log4net.Config.XmlConfigurator.Configure(repository, fileInfo);
 
-            var restClient = new RestClient($"{appSettings.GitLab.Url}/{appSettings.GitLab.ApiPath}");
+            var restClient = new RestClient($"{appSettings.GitLab.Url}");
             restClient.AddDefaultHeader("PRIVATE-TOKEN", appSettings.GitLab.AccessToken);
 
             var vssBasicCredential = new VssBasicCredential(appSettings.AzureDevOps.AccessToken, string.Empty);

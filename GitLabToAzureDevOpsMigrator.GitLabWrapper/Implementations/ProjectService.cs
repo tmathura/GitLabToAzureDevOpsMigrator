@@ -12,13 +12,13 @@ namespace GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations
         {
             RestSharpClient = restSharpClient;
         }
-        public async Task<StatisticsRoot?> GetIssuesStatistics(int projectId, List<string> labels)
+        public async Task<StatisticsRoot?> GetIssuesStatistics(int projectId, string label)
         {
-            var url = $"projects/{projectId}/issues_statistics";
+            var url = $"api/v4/projects/{projectId}/issues_statistics";
 
-            if (labels.Count > 0)
+            if (!string.IsNullOrWhiteSpace(label))
             {
-                url += $"?labels={string.Join(",", labels)}";
+                url += $"?labels={label}";
             }
 
             var request = new RestRequest(url);

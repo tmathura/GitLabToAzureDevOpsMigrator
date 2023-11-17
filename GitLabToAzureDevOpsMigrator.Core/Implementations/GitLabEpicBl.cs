@@ -1,6 +1,5 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
-using GitLabToAzureDevOpsMigrator.Domain.Models;
-using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
+using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using Microsoft.Extensions.Configuration;
 using NGitLab;
 using NGitLab.Models;
