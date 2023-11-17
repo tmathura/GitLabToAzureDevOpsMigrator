@@ -122,9 +122,33 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                         },
                         new()
                         {
-                        Operation = Operation.Add,
-                        Path = "/fields/System.State",
-                        Value = "New"
+                            Operation = Operation.Add,
+                            Path = "/fields/System.State",
+                            Value = "New"
+                        },
+                        //new()
+                        //{
+                        //    Operation = Operation.Add,
+                        //    Path = "/fields/System.IterationPath",
+                        //    Value = ticket.Issue.Milestone?.Title ?? AppSettings.AzureDevOps.DefaultIterationPath
+                        //},
+                        new()
+                        {
+                            Operation = Operation.Add,
+                            Path = "/fields/System.Tags",
+                            Value = ticket.Issue.Labels.Any() ? string.Join(";", ticket.Issue.Labels) : null
+                        },
+                        //new()
+                        //{
+                        //    Operation = Operation.Add,
+                        //    Path = "/fields/System.CreatedBy",
+                        //    Value = ticket.Issue.Author.Name
+                        //},
+                        new()
+                        {
+                            Operation = Operation.Add,
+                            Path = "/fields/System.CreatedDate",
+                            Value = ticket.Issue.CreatedAt
                         }
                     };
 
@@ -148,13 +172,29 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                             }
                         };
 
+                        if (state == "Closed")
+                        {
+                            //jsonPatchDocument.Add(new JsonPatchOperation
+                            //{
+                            //    Operation = Operation.Add,
+                            //    Path = "/fields/Microsoft.VSTS.Common.ClosedBy",
+                            //    Value = ticket.Issue.ClosedBy.Name
+                            //});
+
+                            jsonPatchDocument.Add(new JsonPatchOperation
+                            {
+                                Operation = Operation.Add,
+                                Path = "/fields/Microsoft.VSTS.Common.ClosedDate",
+                                Value = ticket.Issue.ClosedAt
+                            });
+                        }
+
                         try
                         {
                             await workItemTrackingHttpClient.UpdateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
                         }
                         catch (Exception exception)
                         {
-
                             Logger.Error($"Error updating Azure DevOps work item state for work item #{workItem.Id.Value}.", exception);
                         }
                     }
@@ -168,8 +208,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                         {
                             await UploadAttachment(workItemTrackingHttpClient, attachment, ticket.Issue.IssueId);
                         }
-
-
+                        
                         try
                         {
                             var commentCreate = new CommentCreate
@@ -196,6 +235,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                     count--;
                     errorCount++;
                     Logger.Error($"Error creating Azure DevOps work item for issue #{ticket.Issue.IssueId} - '{ticket.Issue.Title}', was on issue count: {count}.", exception);
+
+                    ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
                 }
             }
 
