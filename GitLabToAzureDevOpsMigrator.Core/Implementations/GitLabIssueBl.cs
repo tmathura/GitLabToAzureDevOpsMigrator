@@ -142,15 +142,22 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
         private static void GetAttachmentInString(string stringToExtractAttachment, string projectUrlSegments, ICollection<Attachment> attachments)
         {
-            const string attachmentPattern = @"\[([^\]]*)\]\(([^)]*)\)";
+            // Create a Regex to find the content inside brackets
+            var regex = new Regex(@"\[([^\]]*)\]\(([^)]*)\)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-            // Use Regex.Match to find all matches in the issue description
-            var matches = Regex.Matches(stringToExtractAttachment, attachmentPattern);
+            // Find matches
+            var matches = regex.Matches(stringToExtractAttachment);
 
             // Iterate through the matches and extract the content inside brackets
             foreach (var match in matches.Cast<Match>())
             {
                 var urlPath = match.Groups[2].Value;
+
+                if (urlPath.Contains("-/issues/"))
+                {
+                    continue;
+                }
+
                 var attachment = new Attachment(match.Groups[1].Value, urlPath, urlPath.Replace(projectUrlSegments, string.Empty), null);
 
                 attachments.Add(attachment);

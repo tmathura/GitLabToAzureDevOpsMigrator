@@ -80,7 +80,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                     foreach (var attachment in ticket.IssueAttachments)
                     {
-                        await UploadAttachment(attachment, workItemTrackingHttpClient);
+                        await UploadAttachment(workItemTrackingHttpClient, attachment, ticket.Issue.IssueId);
                     }
 
                     string type;
@@ -97,6 +97,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                         descriptionPath = "/fields/System.Description";
                     }
 
+                    var state = ticket.Issue.State switch
+                    {
+                        "opened" => "New",
+                        "closed" => "Closed",
+                        "reopened" => "Active",
+                        _ => "New"
+                    };
+
                     // Construct the object containing field values required for the new work item
                     var jsonPatchDocument = new JsonPatchDocument
                     {
@@ -111,6 +119,12 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                             Operation = Operation.Add,
                             Path = descriptionPath,
                             Value = ConvertTextToHtmlAndUpdateAttachmentLinks(ticket.Issue.Description, ticket.IssueAttachments)
+                        },
+                        new()
+                        {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.State",
+                        Value = "New"
                         }
                     };
 
@@ -121,6 +135,30 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                         continue;
                     }
 
+                    // Update the state of the newly created work item if it is not new
+                    if (state != "New")
+                    {
+                        jsonPatchDocument = new JsonPatchDocument
+                        {
+                            new()
+                            {
+                                Operation = Operation.Add,
+                                Path = "/fields/System.State",
+                                Value = state
+                            }
+                        };
+
+                        try
+                        {
+                            await workItemTrackingHttpClient.UpdateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
+                        }
+                        catch (Exception exception)
+                        {
+
+                            Logger.Error($"Error updating Azure DevOps work item state for work item #{workItem.Id.Value}.", exception);
+                        }
+                    }
+
                     ticket.WorkItem = workItem;
 
                     foreach (var commentNote in ticket.CommentNotes.OrderBy(x => x.Note.CreatedAt))
@@ -128,18 +166,28 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                         foreach (var attachment in commentNote.NotesAttachments)
                         {
-                            await UploadAttachment(attachment, workItemTrackingHttpClient);
+                            await UploadAttachment(workItemTrackingHttpClient, attachment, ticket.Issue.IssueId);
                         }
 
-                        var commentCreate = new CommentCreate
+
+                        try
                         {
-                            Text = ConvertTextToHtmlAndUpdateAttachmentLinks(commentNote.Note.Body, commentNote.NotesAttachments)
-                        };
+                            var commentCreate = new CommentCreate
+                            {
+                                Text = ConvertTextToHtmlAndUpdateAttachmentLinks(commentNote.Note.Body, commentNote.NotesAttachments)
+                            };
 
-                        var comment = await workItemTrackingHttpClient.AddCommentAsync(commentCreate, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
+                            var comment = await workItemTrackingHttpClient.AddCommentAsync(commentCreate, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
 
-                        commentNote.Comment = comment;
+                            commentNote.Comment = comment;
+                        }
+                        catch (Exception exception)
+                        {
+                            Logger.Error($"Error adding Azure DevOps work item comment for issue #{ticket.Issue.IssueId}.", exception);
+                        }
                     }
+
+                    Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.Issue.Title}' was just created. ");
 
                     ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
                 }
@@ -159,13 +207,20 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             return tickets;
         }
 
-        private async Task UploadAttachment(Attachment attachment, WorkItemTrackingHttpClientBase workItemTrackingHttpClient)
+        private async Task UploadAttachment(WorkItemTrackingHttpClientBase workItemTrackingHttpClient, Attachment attachment, int issueId)
         {
-            var stream = await GetAttachmentStream(attachment.UrlPathCleaned);
+            try
+            {
+                var stream = await GetAttachmentStream(attachment.UrlPathCleaned);
 
-            var attachmentReference = await workItemTrackingHttpClient.CreateAttachmentAsync(stream, AppSettings.AzureDevOps.ProjectName, fileName: attachment.Name);
+                var attachmentReference = await workItemTrackingHttpClient.CreateAttachmentAsync(stream, AppSettings.AzureDevOps.ProjectName, fileName: attachment.Name);
 
-            attachment.AzureDevOpAttachmentReference = attachmentReference;
+                attachment.AzureDevOpAttachmentReference = attachmentReference;
+            }
+            catch (Exception exception)
+            {
+                Logger.Error($"Error uploading Azure DevOps work item attachment for issue #{issueId}.", exception);
+            }
         }
 
         private async Task<Stream?> GetAttachmentStream(string urlPathCleaned)
@@ -184,13 +239,10 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
         private static string ConvertTextToHtmlAndUpdateAttachmentLinks(string description, List<Attachment> attachments)
         {
             // Regular expression pattern for matching URLs
-            const string urlPattern = @"(?<url>https?://[^\s]+)";
-
-            // Create a Regex object
-            var regex = new Regex(urlPattern);
+            var regex = new Regex(@"(?<!\()\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
             // Replace URLs with Markdown links
-            var formattedDescription = regex.Replace(description, "[$1]($1)");
+            var formattedDescription = regex.Replace(description, "[$0]($0)");
 
             foreach (var attachment in attachments)
             {
