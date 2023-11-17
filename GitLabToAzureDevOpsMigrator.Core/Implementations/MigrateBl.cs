@@ -18,7 +18,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             var tickets = await GitLabIssueBl.CollectIssues();
             if (tickets != null)
             {
-                var workItems = await AzureDevOpsWorkItemBl.CreateWorkItems(tickets);
+                await AzureDevOpsWorkItemBl.CreateWorkItems(tickets);
             }
         }
     }

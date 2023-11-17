@@ -6,5 +6,5 @@ namespace GitLabToAzureDevOpsMigrator.Core.Interfaces;
 public interface IAzureDevOpsWorkItemBl
 {
     Task<List<WorkItem>> GetAllWorkItems();
-    Task<List<Ticket>> CreateWorkItems(List<Ticket> tickets);
+    Task<List<Ticket>?> CreateWorkItems(List<Ticket>? tickets);
 }

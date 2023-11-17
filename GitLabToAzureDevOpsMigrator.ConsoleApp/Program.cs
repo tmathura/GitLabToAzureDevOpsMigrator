@@ -39,6 +39,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IConfiguration, ConfigurationRoot>(_ => (ConfigurationRoot)configuration)
+                .AddSingleton<IConsoleHelper, ConsoleHelper>()
                 .AddSingleton<IRestClient, RestClient>(_ => restClient)
                 .AddSingleton<IProjectService, ProjectService>()
                 .AddSingleton<IGitLabClient, GitLabClient>(_ => new GitLabClient(appSettings.GitLab.Url, appSettings.GitLab.AccessToken))
@@ -61,7 +62,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 stopwatch.Stop();
 
                 var elapsed = stopwatch.Elapsed;
-                var elapsedTimeMessage = $"Time taken to migrate: {elapsed.Hours} hours, {elapsed.Minutes} minutes, {elapsed.Seconds} seconds, {elapsed.Milliseconds} milliseconds";
+                var elapsedTimeMessage = $"{Environment.NewLine}Time taken to migrate: {elapsed.Hours} hours, {elapsed.Minutes} minutes, {elapsed.Seconds} seconds, {elapsed.Milliseconds} milliseconds";
                 
                 Console.WriteLine(elapsedTimeMessage);
                 Logger.Info(elapsedTimeMessage);

@@ -17,14 +17,16 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
     public class AzureDevOpsWorkItemBl : IAzureDevOpsWorkItemBl
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
+        private IConsoleHelper ConsoleHelper { get; }
         private IVssConnection VssConnection { get; }
         private IRestClient RestSharpClient { get; }
         private AppSettings AppSettings { get; } = new();
 
-        public AzureDevOpsWorkItemBl(IConfiguration configuration, IVssConnection vssConnection, IRestClient restSharpClient)
+        public AzureDevOpsWorkItemBl(IConfiguration configuration, IConsoleHelper consoleHelper, IVssConnection vssConnection, IRestClient restSharpClient)
         {
             configuration.Bind(AppSettings);
 
+            ConsoleHelper = consoleHelper;
             VssConnection = vssConnection;
             RestSharpClient = restSharpClient;
         }
@@ -49,17 +51,33 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             return workItems;
         }
 
-        public async Task<List<Ticket>> CreateWorkItems(List<Ticket> tickets)
+        public async Task<List<Ticket>?> CreateWorkItems(List<Ticket>? tickets)
         {
             var count = 0;
+            var errorCount = 0;
             var workItemTrackingHttpClient = await VssConnection.GetClientAsync<WorkItemTrackingHttpClient>();
+
+            if (tickets == null || tickets.Count == 0)
+            {
+                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no tickets to create from.";
+
+                Console.WriteLine(noTicketsMessage);
+                Logger.Info(noTicketsMessage);
+
+                return null;
+            }
+
+            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps work items, there are {tickets.Count} issues to collect.";
+
+            Console.WriteLine(startingProcessMessage);
+            Logger.Info(startingProcessMessage);
 
             foreach (var ticket in tickets)
             {
-                count++;
-
                 try
                 {
+                    count++;
+
                     foreach (var attachment in ticket.IssueAttachments)
                     {
                         await UploadAttachment(attachment, workItemTrackingHttpClient);
@@ -122,13 +140,21 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                         commentNote.Comment = comment;
                     }
+
+                    ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
                 }
                 catch (Exception exception)
                 {
+                    count--;
+                    errorCount++;
                     Logger.Error($"Error creating Azure DevOps work item for issue #{ticket.Issue.IssueId} - '{ticket.Issue.Title}', was on issue count: {count}.", exception);
-                    throw;
                 }
             }
+
+            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps work items, there are {count} work items created & there were errors creating {errorCount} work items.";
+
+            Console.WriteLine(endingProcessMessage);
+            Logger.Info(endingProcessMessage);
 
             return tickets;
         }

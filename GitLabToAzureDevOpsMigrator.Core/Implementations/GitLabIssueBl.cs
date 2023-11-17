@@ -13,17 +13,19 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
     public class GitLabIssueBl : IGitLabIssueBl
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
-        private IProjectService ProjectService { get; }
+        private IConsoleHelper ConsoleHelper { get; }
         public IGitLabClient GitLabClient { get; }
         public IProjectIssueNoteClient ProjectIssueNoteClient { get; }
+        private IProjectService ProjectService { get; }
         private GitLabSettings GitLabSettings { get; }
 
-        public GitLabIssueBl(IConfiguration configuration, IGitLabClient gitLabClient, IProjectIssueNoteClient projectIssueNoteClient, IProjectService projectService)
+        public GitLabIssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IGitLabClient gitLabClient, IProjectIssueNoteClient projectIssueNoteClient, IProjectService projectService)
         {
             var appSettings = new AppSettings();
             configuration.Bind(appSettings);
 
             GitLabSettings = appSettings.GitLab;
+            ConsoleHelper = consoleHelper;
             GitLabClient = gitLabClient;
             ProjectIssueNoteClient = projectIssueNoteClient;
             ProjectService = projectService;
@@ -118,7 +120,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 
                 tickets.Add(ticket);
 
-                DrawConsoleProgressBar(count, allIssuesCount);
+                ConsoleHelper.DrawConsoleProgressBar(count, allIssuesCount);
 
                 Logger.Info($"Collected {count} GitLab issues so far, issue #{issue.IssueId} - '{issue.Title}' was just collected. ");
 
@@ -153,21 +155,6 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                 attachments.Add(attachment);
             }
-        }
-
-        private static void DrawConsoleProgressBar(int progress, int total)
-        {
-            Console.CursorLeft = 0;
-
-            const int progressBarLength = 100;
-            var filledLength = (int)Math.Floor((double)progress / total * progressBarLength);
-
-            Console.Write("[");
-            Console.BackgroundColor = ConsoleColor.Green;
-            Console.Write(new string(' ', filledLength));
-            Console.BackgroundColor = ConsoleColor.Black;
-            Console.Write(new string(' ', progressBarLength - filledLength));
-            Console.Write($"] {progress * 100 / total}%");
         }
     }
 }
