@@ -72,6 +72,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
 
+            var workItemsAdded = new Dictionary<int, WorkItem>();
+
             foreach (var ticket in tickets)
             {
                 try
@@ -152,6 +154,23 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                         }
                     };
 
+                    foreach (var relatedIssue in ticket.RelatedIssues)
+                    {
+                        if (workItemsAdded.TryGetValue(relatedIssue.IssueId, out var relatedWorkItem))
+                        {
+                            jsonPatchDocument.Add(new JsonPatchOperation
+                            {
+                                Operation = Operation.Add,
+                                Path = "/relations/-",
+                                Value = new
+                                {
+                                    Rel = "System.LinkTypes.Related",
+                                    relatedWorkItem.Url
+                                }
+                            });
+                        }
+                    }
+
                     var workItem = await workItemTrackingHttpClient.CreateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, type);
 
                     if (workItem.Id == null)
@@ -201,6 +220,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
                     ticket.WorkItem = workItem;
 
+                    workItemsAdded.Add(ticket.Issue.IssueId, workItem);
+
                     foreach (var commentNote in ticket.CommentNotes.OrderBy(x => x.Note.CreatedAt))
                     {
 
@@ -225,7 +246,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                             Logger.Error($"Error adding Azure DevOps work item comment for issue #{ticket.Issue.IssueId}.", exception);
                         }
                     }
-
+                    
                     Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.Issue.Title}' was just created. ");
 
                     ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
