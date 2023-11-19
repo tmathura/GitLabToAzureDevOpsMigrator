@@ -75,7 +75,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
             var workItemsAdded = new Dictionary<int, WorkItem>();
 
-            foreach (var ticket in tickets)
+            foreach (var ticket in tickets.OrderBy(ticket => ticket.Issue.CreatedAt))
             {
                 try
                 {
