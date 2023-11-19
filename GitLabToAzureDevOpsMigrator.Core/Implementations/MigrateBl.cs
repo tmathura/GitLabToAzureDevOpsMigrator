@@ -9,9 +9,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
         private IMilestoneBl MilestoneBl { get; }
         private IIterationBl IterationBl { get; }
         private IIssueBl IssueBl { get; }
-        private IAzureDevOpsWorkItemBl AzureDevOpsWorkItemBl { get; }
+        private IWorkItemBl AzureDevOpsWorkItemBl { get; }
 
-        public MigrateBl(IMilestoneBl milestoneBl, IIterationBl iterationBl, IIssueBl issueBl, IAzureDevOpsWorkItemBl azureDevOpsWorkItemBl)
+        public MigrateBl(IMilestoneBl milestoneBl, IIterationBl iterationBl, IIssueBl issueBl, IWorkItemBl azureDevOpsWorkItemBl)
         {
             MilestoneBl = milestoneBl;
             IterationBl = iterationBl;

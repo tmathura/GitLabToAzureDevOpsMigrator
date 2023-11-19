@@ -52,7 +52,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 .AddSingleton<IProjectIssueNoteClient, ProjectIssueNoteClient>(services => (ProjectIssueNoteClient)services.GetRequiredService<IGitLabClient>().GetProjectIssueNoteClient(appSettings.GitLab.ProjectId))
                 .AddSingleton<IIssueBl, IssueBl>()
                 .AddSingleton<IVssConnection, VssConnectionWrapper>(_ => new VssConnectionWrapper(new Uri(appSettings.AzureDevOps.Url), vssBasicCredential))
-                .AddSingleton<IAzureDevOpsWorkItemBl, AzureDevOpsWorkItemBl>()
+                .AddSingleton<IWorkItemBl, WorkItemBl>()
                 .AddSingleton<IMigrateBl, MigrateBl>()
                 .BuildServiceProvider();
 

@@ -15,7 +15,7 @@ using System.Text.RegularExpressions;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 {
-    public class AzureDevOpsWorkItemBl : IAzureDevOpsWorkItemBl
+    public class WorkItemBl : IWorkItemBl
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IConsoleHelper ConsoleHelper { get; }
@@ -23,7 +23,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
         private IRestClient RestSharpClient { get; }
         private AppSettings AppSettings { get; } = new();
 
-        public AzureDevOpsWorkItemBl(IConfiguration configuration, IConsoleHelper consoleHelper, IVssConnection vssConnection, IRestClient restSharpClient)
+        public WorkItemBl(IConfiguration configuration, IConsoleHelper consoleHelper, IVssConnection vssConnection, IRestClient restSharpClient)
         {
             configuration.Bind(AppSettings);
 
