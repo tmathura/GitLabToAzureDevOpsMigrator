@@ -15,12 +15,15 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IConsoleHelper ConsoleHelper { get; }
-        private AppSettings AppSettings { get; } = new();
+        private AzureDevOpsSettings AzureDevOpsSettings { get; }
         private WorkItemTrackingHttpClient WorkItemTrackingHttpClient { get; }
 
         public IterationBl(IConfiguration configuration, IConsoleHelper consoleHelper, IVssConnection vssConnection)
         {
-            configuration.Bind(AppSettings);
+            var appSettings = new AppSettings();
+            configuration.Bind(appSettings);
+
+            AzureDevOpsSettings = appSettings.AzureDevOps;
 
             ConsoleHelper = consoleHelper;
             WorkItemTrackingHttpClient = vssConnection.GetClient<WorkItemTrackingHttpClient>();
@@ -70,7 +73,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         };
                     }
 
-                    var createdWorkItemClassificationNode = await WorkItemTrackingHttpClient.CreateOrUpdateClassificationNodeAsync(workItemClassificationNode, AppSettings.AzureDevOps.ProjectName, TreeStructureGroup.Iterations);
+                    var createdWorkItemClassificationNode = await WorkItemTrackingHttpClient.CreateOrUpdateClassificationNodeAsync(workItemClassificationNode, AzureDevOpsSettings.ProjectName, TreeStructureGroup.Iterations);
                     
                     cycle.Iteration = createdWorkItemClassificationNode;
                     

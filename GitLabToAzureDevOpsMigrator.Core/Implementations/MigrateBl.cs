@@ -1,6 +1,7 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.AzureDevOps;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
+using GitLabToAzureDevOpsMigrator.Domain.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 {
@@ -8,13 +9,15 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
     {
         private IMilestoneBl MilestoneBl { get; }
         private IIterationBl IterationBl { get; }
+        private IEpicBl EpicBl { get; }
         private IIssueBl IssueBl { get; }
         private IWorkItemBl AzureDevOpsWorkItemBl { get; }
 
-        public MigrateBl(IMilestoneBl milestoneBl, IIterationBl iterationBl, IIssueBl issueBl, IWorkItemBl azureDevOpsWorkItemBl)
+        public MigrateBl(IMilestoneBl milestoneBl, IIterationBl iterationBl, IEpicBl epicBl, IIssueBl issueBl, IWorkItemBl azureDevOpsWorkItemBl)
         {
             MilestoneBl = milestoneBl;
             IterationBl = iterationBl;
+            EpicBl = epicBl;
             IssueBl = issueBl;
             AzureDevOpsWorkItemBl = azureDevOpsWorkItemBl;
         }
@@ -28,12 +31,23 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 await IterationBl.Create(cycles);
             }
 
-            var tickets = await IssueBl.Get();
+            var tickets = new List<Ticket>();
 
-            if (tickets != null)
+            var epicTickets = await EpicBl.Get();
+
+            if (epicTickets != null)
             {
-                await AzureDevOpsWorkItemBl.CreateWorkItems(cycles, tickets);
+                tickets.AddRange(epicTickets);
             }
+
+            var issueTickets = await IssueBl.Get();
+
+            if (issueTickets != null)
+            {
+                tickets.AddRange(issueTickets);
+            }
+
+            await AzureDevOpsWorkItemBl.CreateWorkItems(cycles, tickets);
         }
     }
 }

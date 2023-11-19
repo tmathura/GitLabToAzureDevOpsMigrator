@@ -1,23 +1,19 @@
+using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
-using NGitLab.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Domain.Models
 {
     public class Ticket
     {
-        public Ticket(Issue issue, WorkItem? workItem, List<Attachment> issueAttachments, List<CommentNote> commentNotes, List<Issue> relatedIssues)
+        public Ticket(IBacklogItem backlogItem, WorkItem? workItem, List<Annotation> annotations)
         {
-            Issue = issue;
+            BacklogItem = backlogItem;
             WorkItem = workItem;
-            IssueAttachments = issueAttachments;
-            CommentNotes = commentNotes;
-            RelatedIssues = relatedIssues;
+            Annotations = annotations;
         }
 
-        public Issue Issue { get; set; }
+        public IBacklogItem BacklogItem { get; set; }
         public WorkItem? WorkItem { get; set; }
-        public List<Attachment> IssueAttachments { get; set; }
-        public List<CommentNote> CommentNotes { get; set; }
-        public List<Issue> RelatedIssues { get; set; }
+        public List<Annotation> Annotations { get; set; }
     }
 }

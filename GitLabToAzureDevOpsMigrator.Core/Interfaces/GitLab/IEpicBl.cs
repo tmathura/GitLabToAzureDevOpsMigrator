@@ -1,6 +1,8 @@
-﻿namespace GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
+﻿using GitLabToAzureDevOpsMigrator.Domain.Models;
+
+namespace GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 
 public interface IEpicBl
 {
-    void Get();
+    Task<List<Ticket>?> Get();
 }

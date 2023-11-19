@@ -1,18 +1,18 @@
-﻿using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
-using NGitLab.Models;
+﻿using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
+using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Domain.Models
 {
-    public class CommentNote
+    public class Annotation
     {
-        public CommentNote(ProjectIssueNote note, List<Attachment> notesAttachments, Comment? comment)
+        public Annotation(IBacklogItemNote note, List<Attachment> notesAttachments, Comment? comment)
         {
             Note = note;
             NotesAttachments = notesAttachments;
             Comment = comment;
         }
 
-        public ProjectIssueNote Note { get; set; }
+        public IBacklogItemNote Note { get; set; }
         public List<Attachment> NotesAttachments { get; set; }
         public Comment? Comment { get; set; }
     }

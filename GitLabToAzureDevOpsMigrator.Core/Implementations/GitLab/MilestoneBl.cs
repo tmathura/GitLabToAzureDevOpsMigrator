@@ -1,9 +1,7 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
-using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using log4net;
-using Microsoft.Extensions.Configuration;
 using NGitLab;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
@@ -14,11 +12,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
         private IConsoleHelper ConsoleHelper { get; }
         private IMilestoneClient MilestoneClient { get; }
 
-        public MilestoneBl(IConfiguration configuration, IConsoleHelper consoleHelper, IMilestoneClient milestoneClient)
+        public MilestoneBl(IConsoleHelper consoleHelper, IMilestoneClient milestoneClient)
         {
-            var appSettings = new AppSettings();
-            configuration.Bind(appSettings);
-
             ConsoleHelper = consoleHelper;
             MilestoneClient = milestoneClient;
         }
@@ -71,6 +66,5 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                 return null;
             }
         }
-
     }
 }

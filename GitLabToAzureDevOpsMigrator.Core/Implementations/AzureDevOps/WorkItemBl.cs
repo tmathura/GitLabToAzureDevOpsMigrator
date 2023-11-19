@@ -2,6 +2,7 @@
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.AzureDevOps;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
+using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using log4net;
 using Markdig;
@@ -10,6 +11,7 @@ using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.WebApi.Patch;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
+using NGitLab.Models;
 using RestSharp;
 using System.Text.RegularExpressions;
 
@@ -35,7 +37,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             WorkItemTrackingHttpClient = workItemTrackingHttpClient ?? throw new Exception("WorkItemTrackingHttpClient is null.");
         }
 
-        public async Task<List<WorkItem>> GetAllWorkItems()
+        public async Task<WorkItem?> GetWorkItem(int id)
+        {
+            var workItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(AppSettings.AzureDevOps.ProjectName, new[] { id });
+
+            return workItems.FirstOrDefault();
+        }
+
+        public async Task<List<WorkItem>> GetWorkItems()
         {
             // create a wiql object and build our query to get all work items ids from the project
             var wiql = new Wiql
@@ -48,6 +57,11 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             var result = await WorkItemTrackingHttpClient.QueryByWiqlAsync(wiql);
             var ids = result.WorkItems.Select(item => item.Id).ToArray();
 
+            return await GetWorkItems(ids);
+        }
+
+        private async Task<List<WorkItem>> GetWorkItems(IEnumerable<int> ids)
+        {
             var workItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(AppSettings.AzureDevOps.ProjectName, ids);
 
             return workItems;
@@ -60,7 +74,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
             if (tickets == null || tickets.Count == 0)
             {
-                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no issues to create from.";
+                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no GitLab backlog items to create from.";
 
                 Console.WriteLine(noTicketsMessage);
                 Logger.Info(noTicketsMessage);
@@ -68,28 +82,37 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 return null;
             }
 
-            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps work items, there are {tickets.Count} issues to create from.";
+            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps work items, there are {tickets.Count} GitLab backlog items to create from.";
 
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
 
             var workItemsAdded = new Dictionary<int, WorkItem>();
 
-            foreach (var ticket in tickets.OrderBy(ticket => ticket.Issue.CreatedAt))
+            foreach (var ticket in tickets
+                         .OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue))
+                         .ThenBy(ticket => ticket.BacklogItem.CreatedAt))
             {
+                var isEpic = ticket.BacklogItem is BacklogItem<Epic>;
+
                 try
                 {
                     count++;
 
-                    foreach (var attachment in ticket.IssueAttachments)
+                    foreach (var attachment in ticket.BacklogItem.Attachments)
                     {
-                        await UploadAttachment(attachment, ticket.Issue.IssueId);
+                        await UploadAttachment(attachment, ticket.BacklogItem.Id, isEpic);
                     }
 
                     string type;
-                    string descriptionPath;
+                    var descriptionPath = "/fields/System.Description";
 
-                    if (ticket.Issue.Labels.Contains("bug"))
+
+                    if (isEpic)
+                    {
+                        type = "Epic";
+                    }
+                    else if (ticket.BacklogItem.Labels.Contains("bug"))
                     {
                         type = "Bug";
                         descriptionPath = "/fields/Microsoft.VSTS.TCM.ReproSteps";
@@ -97,17 +120,15 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     else
                     {
                         type = "User Story";
-                        descriptionPath = "/fields/System.Description";
                     }
 
-                    var state = ticket.Issue.State switch
+                    var state = ticket.BacklogItem.State switch
                     {
                         "opened" => "New",
                         "closed" => "Closed",
                         "reopened" => "Active",
                         _ => "New"
                     };
-
                     // Construct the object containing field values required for the new work item
                     var jsonPatchDocument = new JsonPatchDocument
                     {
@@ -115,13 +136,12 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         {
                             Operation = Operation.Add,
                             Path = "/fields/System.Title",
-                            Value = ticket.Issue.Title
-                        },
-                        new()
+                            Value = ticket.BacklogItem.Title
+                        },new()
                         {
                             Operation = Operation.Add,
                             Path = descriptionPath,
-                            Value = ConvertTextToHtmlAndUpdateAttachmentLinks(ticket.Issue.Description, ticket.IssueAttachments)
+                            Value = ConvertTextToHtmlAndUpdateAttachmentLinks(ticket.BacklogItem.Description, ticket.BacklogItem.Attachments)
                         },
                         new()
                         {
@@ -133,7 +153,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         {
                             Operation = Operation.Add,
                             Path = "/fields/System.Tags",
-                            Value = ticket.Issue.Labels.Any() ? string.Join(";", ticket.Issue.Labels) : null
+                            Value = ticket.BacklogItem.Labels.Any() ? string.Join(";", ticket.BacklogItem.Labels) : null
                         },
                         //new()
                         //{
@@ -145,14 +165,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         {
                             Operation = Operation.Add,
                             Path = "/fields/System.CreatedDate",
-                            Value = ticket.Issue.CreatedAt
+                            Value = ticket.BacklogItem.CreatedAt
                         }
                     };
-
-                    if (!string.IsNullOrWhiteSpace(ticket.Issue.Milestone?.Title))
+                    
+                    if (!string.IsNullOrWhiteSpace(ticket.BacklogItem.Milestone))
                     {
                         var iterationName = AppSettings.AzureDevOps.DefaultIterationPath;
-                        var cycle = cycles?.FirstOrDefault(x => x.Milestone.Title == ticket.Issue.Milestone?.Title);
+                        var cycle = cycles?.FirstOrDefault(cycle => cycle.Milestone.Title == ticket.BacklogItem.Milestone);
 
                         if (cycle?.Iteration != null)
                         {
@@ -167,19 +187,19 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         });
                     }
 
-                    if (ticket.Issue.Weight is > 0)
+                    if (ticket.BacklogItem.Weight is > 0)
                     {
                         jsonPatchDocument.Add(new JsonPatchOperation
                         {
                             Operation = Operation.Add,
                             Path = "/fields/Microsoft.VSTS.Scheduling.StoryPoints",
-                            Value = ticket.Issue.Weight
+                            Value = ticket.BacklogItem.Weight
                         });
                     }
 
-                    foreach (var relatedIssue in ticket.RelatedIssues)
+                    foreach (var relatedIssue in ticket.BacklogItem.RelatedIssues)
                     {
-                        if (workItemsAdded.TryGetValue(relatedIssue.IssueId, out var relatedWorkItem))
+                        if (workItemsAdded.TryGetValue(relatedIssue.Id, out var relatedWorkItem))
                         {
                             jsonPatchDocument.Add(new JsonPatchOperation
                             {
@@ -227,7 +247,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                             {
                                 Operation = Operation.Add,
                                 Path = "/fields/Microsoft.VSTS.Common.ClosedDate",
-                                Value = ticket.Issue.ClosedAt
+                                Value = ticket.BacklogItem.ClosedAt
                             });
                         }
 
@@ -243,41 +263,41 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
                     ticket.WorkItem = workItem;
 
-                    workItemsAdded.Add(ticket.Issue.IssueId, workItem);
+                    workItemsAdded.Add(ticket.BacklogItem.Id, workItem);
 
-                    foreach (var commentNote in ticket.CommentNotes.OrderBy(x => x.Note.CreatedAt))
+                    foreach (var annotation in ticket.Annotations.OrderBy(x => x.Note.CreatedAt))
                     {
 
-                        foreach (var attachment in commentNote.NotesAttachments)
+                        foreach (var attachment in annotation.NotesAttachments)
                         {
-                            await UploadAttachment(attachment, ticket.Issue.IssueId);
+                            await UploadAttachment(attachment, ticket.BacklogItem.Id, isEpic);
                         }
 
                         try
                         {
                             var commentCreate = new CommentCreate
                             {
-                                Text = ConvertTextToHtmlAndUpdateAttachmentLinks(commentNote.Note.Body, commentNote.NotesAttachments)
+                                Text = ConvertTextToHtmlAndUpdateAttachmentLinks(annotation.Note.Body, annotation.NotesAttachments)
                             };
 
                             var comment = await WorkItemTrackingHttpClient.AddCommentAsync(commentCreate, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
 
-                            commentNote.Comment = comment;
+                            annotation.Comment = comment;
                         }
                         catch (Exception exception)
                         {
-                            Logger.Error($"Error adding Azure DevOps work item comment for issue #{ticket.Issue.IssueId}.", exception);
+                            Logger.Error($"Error adding Azure DevOps work item comment for GitLab {(isEpic ? "epic" : "issue")} #{ticket.BacklogItem.Id}.", exception);
                         }
                     }
 
-                    Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.Issue.Title}' was just created. ");
+                    Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.BacklogItem.Title}' was just created. ");
 
                     ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
                 }
                 catch (Exception exception)
                 {
 
-                    Logger.Error($"Error creating Azure DevOps work item for issue #{ticket.Issue.IssueId} - '{ticket.Issue.Title}', was on issue count: {count}.", exception);
+                    Logger.Error($"Error creating Azure DevOps work item for GitLab {(isEpic ? "epic" : "issue")} #{ticket.BacklogItem.Id} - '{ticket.BacklogItem.Title}', was on GitLab backlog item count: {count}.", exception);
 
                     errorCount++;
                     count--;
@@ -294,11 +314,11 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             return tickets;
         }
 
-        private async Task UploadAttachment(Attachment attachment, int issueId)
+        private async Task UploadAttachment(Attachment attachment, int issueId, bool isEpic)
         {
             try
             {
-                var stream = await GetAttachmentStream(attachment.UrlPathCleaned);
+                var stream = await GetAttachmentStream(attachment.UrlPathCleaned, isEpic);
 
                 var attachmentReference = await WorkItemTrackingHttpClient.CreateAttachmentAsync(stream, AppSettings.AzureDevOps.ProjectName, fileName: attachment.Name);
 
@@ -306,13 +326,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             }
             catch (Exception exception)
             {
-                Logger.Error($"Error uploading Azure DevOps work item attachment for issue #{issueId}.", exception);
+                Logger.Error($"Error uploading Azure DevOps work item attachment for GitLab {(isEpic ? "epic" : "issue")} #{issueId}.", exception);
             }
         }
 
-        private async Task<Stream?> GetAttachmentStream(string urlPathCleaned)
+        private async Task<Stream?> GetAttachmentStream(string urlPathCleaned, bool isEpic)
         {
-            var attachmentUrl = $"/{AppSettings.GitLab.GroupName}/{AppSettings.GitLab.ProjectName}{urlPathCleaned}";
+            var attachmentUrl = isEpic ? $"/groups/{AppSettings.GitLab.GroupName}/-{urlPathCleaned}" : $"/{AppSettings.GitLab.GroupName}/{AppSettings.GitLab.ProjectName}{urlPathCleaned}";
+
             var request = new RestRequest(attachmentUrl);
 
             // Add the cookie to the request

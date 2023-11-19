@@ -1,13 +1,13 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
+using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
 using log4net;
 using Microsoft.Extensions.Configuration;
 using NGitLab;
 using NGitLab.Models;
-using System.Text.RegularExpressions;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 {
@@ -26,6 +26,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             configuration.Bind(appSettings);
 
             GitLabSettings = appSettings.GitLab;
+
             ConsoleHelper = consoleHelper;
             ProjectIssueNoteClient = projectIssueNoteClient;
             IssueClient = issueClient;
@@ -91,33 +92,23 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
             try
             {
-                var ticket = new Ticket(issue, null, new List<Attachment>(), new List<CommentNote>(), new List<Issue>());
+                var ticket = new Ticket(new BacklogItem<Issue>(issue), null, new List<Annotation>());
 
-                if (!string.IsNullOrWhiteSpace(issue.Description))
+                try
                 {
-                    GetAttachmentInString(issue.Description, projectUrlSegments, ticket.IssueAttachments);
-                }
-
-                var notes = ProjectIssueNoteClient.ForIssue(issue.IssueId);
-
-                foreach (var note in notes)
-                {
-                    var commentNote = new CommentNote(note, new List<Attachment>(), null);
-
-                    ticket.CommentNotes.Add(commentNote);
-
-                    if (!string.IsNullOrWhiteSpace(note.Body))
+                    if (!string.IsNullOrWhiteSpace(issue.Description))
                     {
-                        GetAttachmentInString(note.Body, projectUrlSegments, commentNote.NotesAttachments);
+                        AttachmentHelper.GetAttachmentInString(issue.Description, projectUrlSegments, ticket.BacklogItem.Attachments);
                     }
                 }
-
-                var relatedIssues = IssueClient.LinkedToAsync(GitLabSettings.ProjectId, issue.IssueId);
-
-                await foreach (var relatedIssue in relatedIssues)
+                catch (Exception exception)
                 {
-                    ticket.RelatedIssues.Add(relatedIssue);
+                    Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}' attachment.", exception);
                 }
+
+                GetNotes(issue, projectUrlSegments, ticket);
+
+                await GetRelatedIssues(issue, ticket);
 
                 tickets.Add(ticket);
 
@@ -141,27 +132,60 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             return processIssueResult;
         }
 
-        private static void GetAttachmentInString(string stringToExtractAttachment, string projectUrlSegments, ICollection<Attachment> attachments)
+        private void GetNotes(Issue issue, string projectUrlSegments, Ticket ticket)
         {
-            // Create a Regex to find the content inside brackets
-            var regex = new Regex(@"\[([^\]]*)\]\(([^)]*)\)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-            // Find matches
-            var matches = regex.Matches(stringToExtractAttachment);
-
-            // Iterate through the matches and extract the content inside brackets
-            foreach (var match in matches.Cast<Match>())
+            try
             {
-                var urlPath = match.Groups[2].Value;
+                var notes = ProjectIssueNoteClient.ForIssue(issue.IssueId);
 
-                if (urlPath.Contains("-/issues/"))
+                foreach (var note in notes)
                 {
-                    continue;
+                    try
+                    {
+                        var annotation = new Annotation(new BacklogItemNote<ProjectIssueNote>(note), new List<Attachment>(), null);
+
+                        ticket.Annotations.Add(annotation);
+
+                        if (string.IsNullOrWhiteSpace(note.Body))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            AttachmentHelper.GetAttachmentInString(note.Body, projectUrlSegments, annotation.NotesAttachments);
+                        }
+                        catch (Exception exception)
+                        {
+                            Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}' note #{note.NoteId} attachment.", exception);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}' note #{note.NoteId}.", exception);
+                    }
                 }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}' notes.", exception);
+            }
+        }
 
-                var attachment = new Attachment(match.Groups[1].Value, urlPath, urlPath.Replace(projectUrlSegments, string.Empty), null);
+        private async Task GetRelatedIssues(Issue issue, Ticket ticket)
+        {
+            try
+            {
+                var relatedIssues = IssueClient.LinkedToAsync(GitLabSettings.ProjectId, issue.IssueId);
 
-                attachments.Add(attachment);
+                await foreach (var relatedIssue in relatedIssues)
+                {
+                    ticket.BacklogItem.RelatedIssues.Add(relatedIssue);
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}' related issues.", exception);
             }
         }
     }

@@ -16,6 +16,7 @@ using Microsoft.VisualStudio.Services.Common;
 using NGitLab;
 using NGitLab.Impl;
 using RestSharp;
+using RestSharp.Serializers.NewtonsoftJson;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -35,8 +36,8 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             var repository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             var fileInfo = new FileInfo("log4net.config");
             log4net.Config.XmlConfigurator.Configure(repository, fileInfo);
-
-            var restClient = new RestClient($"{appSettings.GitLab.Url}");
+            
+            var restClient = new RestClient($"{appSettings.GitLab.Url}", configureSerialization: serializerConfig => serializerConfig.UseSerializer(() => new JsonNetSerializer()));
             restClient.AddDefaultHeader("PRIVATE-TOKEN", appSettings.GitLab.AccessToken);
 
             var vssBasicCredential = new VssBasicCredential(appSettings.AzureDevOps.AccessToken, string.Empty);
@@ -47,12 +48,15 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 .AddSingleton<IMilestoneBl, MilestoneBl>()
                 .AddSingleton<IIterationBl, IterationBl>()
                 .AddSingleton<IRestClient, RestClient>(_ => restClient)
+                .AddSingleton<IGroupService, GroupService>()
                 .AddSingleton<IProjectService, ProjectService>()
                 .AddSingleton<IGitLabClient, GitLabClient>(_ => new GitLabClient(appSettings.GitLab.Url, appSettings.GitLab.AccessToken))
+                .AddSingleton<IEpicClient, EpicClient>(services => services.GetRequiredService<IGitLabClient>().Epics as EpicClient ?? throw new Exception("IEpicClient is null."))
                 .AddSingleton<IProjectIssueNoteClient, ProjectIssueNoteClient>(services => services.GetRequiredService<IGitLabClient>().GetProjectIssueNoteClient(appSettings.GitLab.ProjectId) as ProjectIssueNoteClient ?? throw new Exception("ProjectIssueNoteClient is null."))
                 .AddSingleton<IIssueClient, IssueClient>(services => services.GetRequiredService<IGitLabClient>().Issues as IssueClient ?? throw new Exception("IssueClient is null."))
                 .AddSingleton<IMilestoneClient, MilestoneClient>(services => services.GetRequiredService<IGitLabClient>().GetGroupMilestone(appSettings.GitLab.GroupId) as MilestoneClient ?? throw new Exception("MilestoneClient is null."))
                 .AddSingleton<IIssueBl, IssueBl>()
+                .AddSingleton<IEpicBl, EpicBl>()
                 .AddSingleton<IVssConnection, VssConnectionWrapper>(_ => new VssConnectionWrapper(new Uri(appSettings.AzureDevOps.Url), vssBasicCredential))
                 .AddSingleton<IWorkItemBl, WorkItemBl>()
                 .AddSingleton<IMigrateBl, MigrateBl>()
