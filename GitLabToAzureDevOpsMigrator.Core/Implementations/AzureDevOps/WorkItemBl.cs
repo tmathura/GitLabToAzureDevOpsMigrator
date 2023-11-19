@@ -19,23 +19,24 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IConsoleHelper ConsoleHelper { get; }
-        private IVssConnection VssConnection { get; }
         private IRestClient RestSharpClient { get; }
         private AppSettings AppSettings { get; } = new();
+        private WorkItemTrackingHttpClient WorkItemTrackingHttpClient { get; }
 
         public WorkItemBl(IConfiguration configuration, IConsoleHelper consoleHelper, IVssConnection vssConnection, IRestClient restSharpClient)
         {
             configuration.Bind(AppSettings);
 
             ConsoleHelper = consoleHelper;
-            VssConnection = vssConnection;
             RestSharpClient = restSharpClient;
+
+            var workItemTrackingHttpClient = vssConnection.GetClient<WorkItemTrackingHttpClient>();
+
+            WorkItemTrackingHttpClient = workItemTrackingHttpClient ?? throw new Exception("WorkItemTrackingHttpClient is null.");
         }
 
         public async Task<List<WorkItem>> GetAllWorkItems()
         {
-            var workItemTrackingHttpClient = await VssConnection.GetClientAsync<WorkItemTrackingHttpClient>();
-
             // create a wiql object and build our query to get all work items ids from the project
             var wiql = new Wiql
             {
@@ -44,19 +45,18 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         $"Where [System.TeamProject] = '{AppSettings.AzureDevOps.ProjectName}' "
             };
 
-            var result = await workItemTrackingHttpClient.QueryByWiqlAsync(wiql);
+            var result = await WorkItemTrackingHttpClient.QueryByWiqlAsync(wiql);
             var ids = result.WorkItems.Select(item => item.Id).ToArray();
 
-            var workItems = await workItemTrackingHttpClient.GetWorkItemsAsync(AppSettings.AzureDevOps.ProjectName, ids);
+            var workItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(AppSettings.AzureDevOps.ProjectName, ids);
 
             return workItems;
         }
 
-        public async Task<List<Ticket>?> CreateWorkItems(List<Ticket>? tickets)
+        public async Task<List<Ticket>?> CreateWorkItems(List<Cycle>? cycles, List<Ticket>? tickets)
         {
             var count = 0;
             var errorCount = 0;
-            var workItemTrackingHttpClient = await VssConnection.GetClientAsync<WorkItemTrackingHttpClient>();
 
             if (tickets == null || tickets.Count == 0)
             {
@@ -83,7 +83,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
                     foreach (var attachment in ticket.IssueAttachments)
                     {
-                        await UploadAttachment(workItemTrackingHttpClient, attachment, ticket.Issue.IssueId);
+                        await UploadAttachment(attachment, ticket.Issue.IssueId);
                     }
 
                     string type;
@@ -129,12 +129,6 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                             Path = "/fields/System.State",
                             Value = "New"
                         },
-                        //new()
-                        //{
-                        //    Operation = Operation.Add,
-                        //    Path = "/fields/System.IterationPath",
-                        //    Value = ticket.Issue.Milestone?.Title ?? AppSettings.AzureDevOps.DefaultIterationPath
-                        //},
                         new()
                         {
                             Operation = Operation.Add,
@@ -155,6 +149,24 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         }
                     };
 
+                    if (!string.IsNullOrWhiteSpace(ticket.Issue.Milestone?.Title))
+                    {
+                        var iterationName = AppSettings.AzureDevOps.DefaultIterationPath;
+                        var cycle = cycles?.FirstOrDefault(x => x.Milestone.Title == ticket.Issue.Milestone?.Title);
+
+                        if (cycle?.Iteration != null)
+                        {
+                            iterationName = @$"{iterationName}\{cycle.Iteration.Name}";
+                        }
+
+                        jsonPatchDocument.Add(new JsonPatchOperation
+                        {
+                            Operation = Operation.Add,
+                            Path = "/fields/System.IterationPath",
+                            Value = iterationName
+                        });
+                    }
+
                     foreach (var relatedIssue in ticket.RelatedIssues)
                     {
                         if (workItemsAdded.TryGetValue(relatedIssue.IssueId, out var relatedWorkItem))
@@ -172,7 +184,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         }
                     }
 
-                    var workItem = await workItemTrackingHttpClient.CreateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, type);
+                    var workItem = await WorkItemTrackingHttpClient.CreateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, type);
 
                     if (workItem.Id == null)
                     {
@@ -211,7 +223,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
                         try
                         {
-                            await workItemTrackingHttpClient.UpdateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
+                            await WorkItemTrackingHttpClient.UpdateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
                         }
                         catch (Exception exception)
                         {
@@ -228,7 +240,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
                         foreach (var attachment in commentNote.NotesAttachments)
                         {
-                            await UploadAttachment(workItemTrackingHttpClient, attachment, ticket.Issue.IssueId);
+                            await UploadAttachment(attachment, ticket.Issue.IssueId);
                         }
 
                         try
@@ -238,7 +250,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                                 Text = ConvertTextToHtmlAndUpdateAttachmentLinks(commentNote.Note.Body, commentNote.NotesAttachments)
                             };
 
-                            var comment = await workItemTrackingHttpClient.AddCommentAsync(commentCreate, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
+                            var comment = await WorkItemTrackingHttpClient.AddCommentAsync(commentCreate, AppSettings.AzureDevOps.ProjectName, workItem.Id.Value);
 
                             commentNote.Comment = comment;
                         }
@@ -272,13 +284,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             return tickets;
         }
 
-        private async Task UploadAttachment(WorkItemTrackingHttpClientBase workItemTrackingHttpClient, Attachment attachment, int issueId)
+        private async Task UploadAttachment(Attachment attachment, int issueId)
         {
             try
             {
                 var stream = await GetAttachmentStream(attachment.UrlPathCleaned);
 
-                var attachmentReference = await workItemTrackingHttpClient.CreateAttachmentAsync(stream, AppSettings.AzureDevOps.ProjectName, fileName: attachment.Name);
+                var attachmentReference = await WorkItemTrackingHttpClient.CreateAttachmentAsync(stream, AppSettings.AzureDevOps.ProjectName, fileName: attachment.Name);
 
                 attachment.AzureDevOpAttachmentReference = attachmentReference;
             }

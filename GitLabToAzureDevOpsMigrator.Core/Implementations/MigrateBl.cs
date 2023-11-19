@@ -32,7 +32,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 
             if (tickets != null)
             {
-                await AzureDevOpsWorkItemBl.CreateWorkItems(tickets);
+                await AzureDevOpsWorkItemBl.CreateWorkItems(cycles, tickets);
             }
         }
     }

@@ -14,16 +14,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
         private IConsoleHelper ConsoleHelper { get; }
         private IMilestoneClient MilestoneClient { get; }
 
-        public MilestoneBl(IConfiguration configuration, IConsoleHelper consoleHelper, IGitLabClient gitLabClient)
+        public MilestoneBl(IConfiguration configuration, IConsoleHelper consoleHelper, IMilestoneClient milestoneClient)
         {
             var appSettings = new AppSettings();
             configuration.Bind(appSettings);
 
             ConsoleHelper = consoleHelper;
-
-            var milestoneClient = gitLabClient.GetGroupMilestone(appSettings.GitLab.GroupId);
-
-            MilestoneClient = milestoneClient ?? throw new Exception("MilestoneClient is null.");
+            MilestoneClient = milestoneClient;
         }
         
         public List<Cycle>? Get()

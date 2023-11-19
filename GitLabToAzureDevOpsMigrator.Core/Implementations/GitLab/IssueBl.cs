@@ -15,20 +15,20 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IConsoleHelper ConsoleHelper { get; }
-        public IGitLabClient GitLabClient { get; }
         public IProjectIssueNoteClient ProjectIssueNoteClient { get; }
+        public IIssueClient IssueClient { get; }
         private IProjectService ProjectService { get; }
         private GitLabSettings GitLabSettings { get; }
 
-        public IssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IGitLabClient gitLabClient, IProjectIssueNoteClient projectIssueNoteClient, IProjectService projectService)
+        public IssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IProjectIssueNoteClient projectIssueNoteClient, IIssueClient issueClient, IProjectService projectService)
         {
             var appSettings = new AppSettings();
             configuration.Bind(appSettings);
 
             GitLabSettings = appSettings.GitLab;
             ConsoleHelper = consoleHelper;
-            GitLabClient = gitLabClient;
             ProjectIssueNoteClient = projectIssueNoteClient;
+            IssueClient = issueClient;
             ProjectService = projectService;
         }
 
@@ -38,7 +38,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
             if (statisticsRoot == null)
             {
-                const string noStatisticsMessage = "Collecting GitLab issues encountered a problem, StatisticsRoot is null.";
+                var noStatisticsMessage = $"{Environment.NewLine}Collecting GitLab issues encountered a problem, StatisticsRoot is null.";
 
                 Console.WriteLine(noStatisticsMessage);
                 Logger.Info(noStatisticsMessage);
@@ -48,14 +48,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
             var allIssuesCount = statisticsRoot.Statistics.Counts.All;
 
-            var startingProcessMessage = $"Started collecting GitLab issues, there are {allIssuesCount} issues to collect.";
+            var startingProcessMessage = $"{Environment.NewLine}Started collecting GitLab issues, there are {allIssuesCount} issues to collect.";
 
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
 
             var projectUrlSegments = $"/{GitLabSettings.GroupName}/{GitLabSettings.ProjectName}";
 
-            var issues = GitLabClient.Issues.GetAsync(GitLabSettings.ProjectId, new IssueQuery { Labels = GitLabSettings.LabelToMigrate });
+            var issues = IssueClient.GetAsync(GitLabSettings.ProjectId, new IssueQuery { Labels = GitLabSettings.LabelToMigrate });
 
             var count = 0;
             var tickets = new List<Ticket>();
@@ -112,7 +112,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                     }
                 }
 
-                var relatedIssues = GitLabClient.Issues.LinkedToAsync(GitLabSettings.ProjectId, issue.IssueId);
+                var relatedIssues = IssueClient.LinkedToAsync(GitLabSettings.ProjectId, issue.IssueId);
 
                 await foreach (var relatedIssue in relatedIssues)
                 {
