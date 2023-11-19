@@ -1,5 +1,6 @@
 ﻿using GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
+using GitLabToAzureDevOpsMigrator.Core.Interfaces.AzureDevOps;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using log4net;
@@ -12,7 +13,7 @@ using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using RestSharp;
 using System.Text.RegularExpressions;
 
-namespace GitLabToAzureDevOpsMigrator.Core.Implementations
+namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 {
     public class AzureDevOpsWorkItemBl : IAzureDevOpsWorkItemBl
     {
@@ -56,7 +57,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             var count = 0;
             var errorCount = 0;
             var workItemTrackingHttpClient = await VssConnection.GetClientAsync<WorkItemTrackingHttpClient>();
-            
+
             if (tickets == null || tickets.Count == 0)
             {
                 var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no issues to create from.";
@@ -229,7 +230,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                         {
                             await UploadAttachment(workItemTrackingHttpClient, attachment, ticket.Issue.IssueId);
                         }
-                        
+
                         try
                         {
                             var commentCreate = new CommentCreate
@@ -246,7 +247,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                             Logger.Error($"Error adding Azure DevOps work item comment for issue #{ticket.Issue.IssueId}.", exception);
                         }
                     }
-                    
+
                     Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.Issue.Title}' was just created. ");
 
                     ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);

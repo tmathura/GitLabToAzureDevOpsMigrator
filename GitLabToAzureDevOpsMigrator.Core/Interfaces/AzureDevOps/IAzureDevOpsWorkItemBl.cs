@@ -1,7 +1,7 @@
 ﻿using GitLabToAzureDevOpsMigrator.Domain.Models;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 
-namespace GitLabToAzureDevOpsMigrator.Core.Interfaces;
+namespace GitLabToAzureDevOpsMigrator.Core.Interfaces.AzureDevOps;
 
 public interface IAzureDevOpsWorkItemBl
 {
