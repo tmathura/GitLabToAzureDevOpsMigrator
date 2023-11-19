@@ -11,7 +11,7 @@ using System.Text.RegularExpressions;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 {
-    public class GitLabIssueBl : IGitLabIssueBl
+    public class IssueBl : IIssueBl
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IConsoleHelper ConsoleHelper { get; }
@@ -20,7 +20,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
         private IProjectService ProjectService { get; }
         private GitLabSettings GitLabSettings { get; }
 
-        public GitLabIssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IGitLabClient gitLabClient, IProjectIssueNoteClient projectIssueNoteClient, IProjectService projectService)
+        public IssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IGitLabClient gitLabClient, IProjectIssueNoteClient projectIssueNoteClient, IProjectService projectService)
         {
             var appSettings = new AppSettings();
             configuration.Bind(appSettings);

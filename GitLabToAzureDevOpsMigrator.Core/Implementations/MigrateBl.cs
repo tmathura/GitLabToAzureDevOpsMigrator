@@ -8,14 +8,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
     {
         private IMilestoneBl MilestoneBl { get; }
         private IIterationBl IterationBl { get; }
-        private IGitLabIssueBl GitLabIssueBl { get; }
+        private IIssueBl IssueBl { get; }
         private IAzureDevOpsWorkItemBl AzureDevOpsWorkItemBl { get; }
 
-        public MigrateBl(IMilestoneBl milestoneBl, IIterationBl iterationBl, IGitLabIssueBl gitLabIssueBl, IAzureDevOpsWorkItemBl azureDevOpsWorkItemBl)
+        public MigrateBl(IMilestoneBl milestoneBl, IIterationBl iterationBl, IIssueBl issueBl, IAzureDevOpsWorkItemBl azureDevOpsWorkItemBl)
         {
             MilestoneBl = milestoneBl;
             IterationBl = iterationBl;
-            GitLabIssueBl = gitLabIssueBl;
+            IssueBl = issueBl;
             AzureDevOpsWorkItemBl = azureDevOpsWorkItemBl;
         }
         
@@ -28,7 +28,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 await IterationBl.Create(cycles);
             }
 
-            var tickets = await GitLabIssueBl.CollectIssues();
+            var tickets = await IssueBl.CollectIssues();
 
             if (tickets != null)
             {

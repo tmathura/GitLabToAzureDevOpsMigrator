@@ -2,7 +2,7 @@
 
 namespace GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 
-public interface IGitLabIssueBl
+public interface IIssueBl
 {
     Task<List<Ticket>?> CollectIssues();
 }

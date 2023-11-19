@@ -6,12 +6,12 @@ using NGitLab.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 {
-    public class GitLabEpicBl : IGitLabEpicBl
+    public class EpicBl : IEpicBl
     {
         private IGitLabClient GitLabClient { get; }
         private GitLabSettings GitLabSettings { get; }
 
-        public GitLabEpicBl(IConfiguration configuration, IGitLabClient gitLabClient)
+        public EpicBl(IConfiguration configuration, IGitLabClient gitLabClient)
         {
             GitLabClient = gitLabClient;
             var appSettings = new AppSettings();

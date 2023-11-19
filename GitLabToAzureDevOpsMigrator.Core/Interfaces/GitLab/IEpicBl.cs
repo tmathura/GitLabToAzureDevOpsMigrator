@@ -1,6 +1,6 @@
 ﻿namespace GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 
-public interface IGitLabEpicBl
+public interface IEpicBl
 {
     void CollectEpics();
 }
