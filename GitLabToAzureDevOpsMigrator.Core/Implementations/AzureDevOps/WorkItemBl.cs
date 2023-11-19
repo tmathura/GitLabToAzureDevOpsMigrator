@@ -286,7 +286,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 }
             }
 
-            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps work items, there are {count} work items created & there were errors creating {errorCount} work items.";
+            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps work items, there were {count} work items created & there were errors creating {errorCount} work items.";
 
             Console.WriteLine(endingProcessMessage);
             Logger.Info(endingProcessMessage);

@@ -89,7 +89,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 }
             }
 
-            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps iterations, there are {count} iterations created & there were errors creating {errorCount} iterations.";
+            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps iterations, there were {count} iterations created & there were errors creating {errorCount} iterations.";
 
             Console.WriteLine(endingProcessMessage);
             Logger.Info(endingProcessMessage);

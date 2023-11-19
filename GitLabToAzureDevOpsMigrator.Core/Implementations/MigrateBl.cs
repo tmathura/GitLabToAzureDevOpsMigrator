@@ -28,7 +28,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 await IterationBl.Create(cycles);
             }
 
-            var tickets = await IssueBl.CollectIssues();
+            var tickets = await IssueBl.Get();
 
             if (tickets != null)
             {

@@ -51,13 +51,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                     {
                         errorCount++;
 
-                        Logger.Error($"Error collecting GitLab milestone #{milestone.Id} - '{milestone.Title}', was on milestone count: {count}.", exception);
+                        Logger.Error($"Error getting GitLab milestone #{milestone.Id} - '{milestone.Title}', was on milestone count: {count}.", exception);
 
                         count--;
                     }
                 }
 
-                var endingProcessMessage = $"{Environment.NewLine}Finished getting GitLab milestones, there are {count} milestones collected & there were errors getting {errorCount} milestones.";
+                var endingProcessMessage = $"{Environment.NewLine}Finished getting GitLab milestones, there were {count} milestones retrieved & there were errors getting {errorCount} milestones.";
 
                 Console.WriteLine(endingProcessMessage);
                 Logger.Info(endingProcessMessage);

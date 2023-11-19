@@ -32,13 +32,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             ProjectService = projectService;
         }
 
-        public async Task<List<Ticket>?> CollectIssues()
+        public async Task<List<Ticket>?> Get()
         {
             var statisticsRoot = await ProjectService.GetIssuesStatistics(GitLabSettings.ProjectId, GitLabSettings.LabelToMigrate);
 
             if (statisticsRoot == null)
             {
-                var noStatisticsMessage = $"{Environment.NewLine}Collecting GitLab issues encountered a problem, StatisticsRoot is null.";
+                var noStatisticsMessage = $"{Environment.NewLine}Getting GitLab issues encountered a problem, StatisticsRoot is null.";
 
                 Console.WriteLine(noStatisticsMessage);
                 Logger.Info(noStatisticsMessage);
@@ -48,7 +48,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
             var allIssuesCount = statisticsRoot.Statistics.Counts.All;
 
-            var startingProcessMessage = $"{Environment.NewLine}Started collecting GitLab issues, there are {allIssuesCount} issues to collect.";
+            var startingProcessMessage = $"{Environment.NewLine}Started getting GitLab issues, there are {allIssuesCount} issues to retrieve.";
 
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
@@ -77,7 +77,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             var processedCount = processedResults.Sum(result => result.Count);
             var errorCount = processedResults.Sum(result => result.ErrorCount);
 
-            var endingProcessMessage = $"{Environment.NewLine}Finished collecting GitLab issues, there are {processedCount} issues collected & there were errors collecting {errorCount} issues.";
+            var endingProcessMessage = $"{Environment.NewLine}Finished getting GitLab issues, there were {processedCount} issues retrieved & there were errors getting {errorCount} issues.";
 
             Console.WriteLine(endingProcessMessage);
             Logger.Info(endingProcessMessage);
@@ -123,13 +123,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
                 ConsoleHelper.DrawConsoleProgressBar(count, allIssuesCount);
 
-                Logger.Info($"Collected {count} GitLab issues so far, issue #{issue.IssueId} - '{issue.Title}' was just collected. ");
+                Logger.Info($"Retrieved {count} GitLab issues so far, issue #{issue.IssueId} - '{issue.Title}' was just retrieved. ");
 
                 processIssueResult.Count = 1;
             }
             catch (Exception exception)
             {
-                Logger.Error($"Error collecting GitLab issue #{issue.IssueId} - '{issue.Title}', was on issue count: {count}.", exception);
+                Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}', was on issue count: {count}.", exception);
 
                 processIssueResult.ErrorCount = 1;
             }

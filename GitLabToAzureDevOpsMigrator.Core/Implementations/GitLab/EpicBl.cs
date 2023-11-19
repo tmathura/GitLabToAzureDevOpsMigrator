@@ -19,7 +19,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             GitLabSettings = appSettings.GitLab;
         }
 
-        public void CollectEpics()
+        public void Get()
         {
             var epics = GitLabClient.Epics.Get(GitLabSettings.GroupId, new EpicQuery()).ToList();
 

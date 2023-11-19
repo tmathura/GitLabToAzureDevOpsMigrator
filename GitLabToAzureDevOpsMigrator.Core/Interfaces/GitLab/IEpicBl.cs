@@ -2,5 +2,5 @@
 
 public interface IEpicBl
 {
-    void CollectEpics();
+    void Get();
 }
