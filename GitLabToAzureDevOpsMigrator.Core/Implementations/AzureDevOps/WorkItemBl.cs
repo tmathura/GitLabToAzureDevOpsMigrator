@@ -167,6 +167,16 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         });
                     }
 
+                    if (ticket.Issue.Weight is > 0)
+                    {
+                        jsonPatchDocument.Add(new JsonPatchOperation
+                        {
+                            Operation = Operation.Add,
+                            Path = "/fields/Microsoft.VSTS.Scheduling.StoryPoints",
+                            Value = ticket.Issue.Weight
+                        });
+                    }
+
                     foreach (var relatedIssue in ticket.RelatedIssues)
                     {
                         if (workItemsAdded.TryGetValue(relatedIssue.IssueId, out var relatedWorkItem))
