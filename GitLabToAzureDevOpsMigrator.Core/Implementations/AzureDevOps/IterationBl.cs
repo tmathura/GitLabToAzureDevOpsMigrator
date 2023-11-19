@@ -46,7 +46,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
 
-            foreach (var cycle in cycles)
+            foreach (var cycle in cycles.OrderBy(GetCycleStartDate))
             {
                 try
                 {
@@ -95,6 +95,15 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             Logger.Info(endingProcessMessage);
 
             return cycles;
+        }
+
+        private static DateTime GetCycleStartDate(Cycle cycle)
+        {
+            if (TryParse(cycle.Milestone.StartDate, out var startDate) && startDate != MinValue)
+            {
+                return startDate;
+            }
+            return MinValue;
         }
 
         private static string CleanTitle(string title)
