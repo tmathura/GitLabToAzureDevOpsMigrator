@@ -1,6 +1,6 @@
 ﻿using GitLabToAzureDevOpsMigrator.Domain.Models;
 
-namespace GitLabToAzureDevOpsMigrator.Core.Interfaces;
+namespace GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 
 public interface IGitLabIssueBl
 {

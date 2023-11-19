@@ -1,10 +1,10 @@
-﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
+﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using Microsoft.Extensions.Configuration;
 using NGitLab;
 using NGitLab.Models;
 
-namespace GitLabToAzureDevOpsMigrator.Core.Implementations
+namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 {
     public class GitLabEpicBl : IGitLabEpicBl
     {

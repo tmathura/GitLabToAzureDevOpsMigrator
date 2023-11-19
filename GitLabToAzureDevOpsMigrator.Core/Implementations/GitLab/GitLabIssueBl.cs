@@ -1,4 +1,5 @@
 ﻿using GitLabToAzureDevOpsMigrator.Core.Interfaces;
+using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
@@ -8,7 +9,7 @@ using NGitLab;
 using NGitLab.Models;
 using System.Text.RegularExpressions;
 
-namespace GitLabToAzureDevOpsMigrator.Core.Implementations
+namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 {
     public class GitLabIssueBl : IGitLabIssueBl
     {
@@ -30,7 +31,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             ProjectIssueNoteClient = projectIssueNoteClient;
             ProjectService = projectService;
         }
-        
+
         public async Task<List<Ticket>?> CollectIssues()
         {
             var statisticsRoot = await ProjectService.GetIssuesStatistics(GitLabSettings.ProjectId, GitLabSettings.LabelToMigrate);
@@ -117,7 +118,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 {
                     ticket.RelatedIssues.Add(relatedIssue);
                 }
-                
+
                 tickets.Add(ticket);
 
                 ConsoleHelper.DrawConsoleProgressBar(count, allIssuesCount);
