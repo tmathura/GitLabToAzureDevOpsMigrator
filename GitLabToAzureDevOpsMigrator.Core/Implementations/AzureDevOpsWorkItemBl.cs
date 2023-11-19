@@ -56,10 +56,10 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
             var count = 0;
             var errorCount = 0;
             var workItemTrackingHttpClient = await VssConnection.GetClientAsync<WorkItemTrackingHttpClient>();
-
+            
             if (tickets == null || tickets.Count == 0)
             {
-                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no tickets to create from.";
+                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no issues to create from.";
 
                 Console.WriteLine(noTicketsMessage);
                 Logger.Info(noTicketsMessage);
@@ -67,7 +67,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 return null;
             }
 
-            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps work items, there are {tickets.Count} issues to collect.";
+            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps work items, there are {tickets.Count} issues to create from.";
 
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
@@ -253,9 +253,11 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 }
                 catch (Exception exception)
                 {
-                    count--;
-                    errorCount++;
+
                     Logger.Error($"Error creating Azure DevOps work item for issue #{ticket.Issue.IssueId} - '{ticket.Issue.Title}', was on issue count: {count}.", exception);
+
+                    errorCount++;
+                    count--;
 
                     ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
                 }

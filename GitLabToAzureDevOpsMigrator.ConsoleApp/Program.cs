@@ -1,7 +1,11 @@
 ﻿using GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.Implementations;
 using GitLabToAzureDevOpsMigrator.AzureDevOpsWrapper.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Implementations;
+using GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps;
+using GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
+using GitLabToAzureDevOpsMigrator.Core.Interfaces.AzureDevOps;
+using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
@@ -40,6 +44,8 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IConfiguration, ConfigurationRoot>(_ => (ConfigurationRoot)configuration)
                 .AddSingleton<IConsoleHelper, ConsoleHelper>()
+                .AddSingleton<IMilestoneBl, MilestoneBl>()
+                .AddSingleton<IIterationBl, IterationBl>()
                 .AddSingleton<IRestClient, RestClient>(_ => restClient)
                 .AddSingleton<IProjectService, ProjectService>()
                 .AddSingleton<IGitLabClient, GitLabClient>(_ => new GitLabClient(appSettings.GitLab.Url, appSettings.GitLab.AccessToken))

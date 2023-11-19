@@ -4,6 +4,17 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
 {
     public class ConsoleHelper : IConsoleHelper
     {
+        public void DrawConsoleProgressCount(int count)
+        {
+            Console.CursorLeft = 0;
+            
+            Console.Write("[");
+            Console.BackgroundColor = ConsoleColor.Green;
+            Console.Write($" Progress: {count}");
+            Console.BackgroundColor = ConsoleColor.Black;
+            Console.Write("]");
+        }
+
         public void DrawConsoleProgressBar(int progress, int total)
         {
             Console.CursorLeft = 0;
