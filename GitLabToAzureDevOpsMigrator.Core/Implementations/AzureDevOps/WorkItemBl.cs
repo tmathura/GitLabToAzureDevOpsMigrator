@@ -126,6 +126,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         "reopened" => "Active",
                         _ => "New"
                     };
+                    
+                    var backlogItemDescription = $"{type} created from GitLab {GetTicketType(isEpic)} [#{ticket.BacklogItem.Id}]({ticket.BacklogItem.WebUrl}){Environment.NewLine}{Environment.NewLine}{ticket.BacklogItem.Description}";
 
                     // Construct the object containing field values required for the new work item
                     var jsonPatchDocument = new JsonPatchDocument
@@ -134,12 +136,12 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         {
                             Operation = Operation.Add,
                             Path = "/fields/System.Title",
-                            Value = $"(#{ticket.BacklogItem.Id}) {ticket.BacklogItem.Title}"
+                            Value = ticket.BacklogItem.Title
                         },new()
                         {
                             Operation = Operation.Add,
                             Path = descriptionPath,
-                            Value = ConvertTextToHtmlAndUpdateAttachmentLinks(ticket.BacklogItem.Description, ticket.BacklogItem.DescriptionAttachments)
+                            Value = ConvertTextToHtmlAndUpdateAttachmentLinks(backlogItemDescription, ticket.BacklogItem.DescriptionAttachments)
                         },
                         new()
                         {
@@ -215,9 +217,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     workItemsAdded.Add(ticket.BacklogItem.Id, workItem);
 
                     await AddComments(ticket.BacklogItem.Id, workItem.Id.Value, ticket.Annotations, isEpic);
-
-                    await AddComment(ticket.BacklogItem.Id, workItem.Id.Value, isEpic, $"Work item created from GitLab {GetTicketType(isEpic)} [#{ticket.BacklogItem.Id}]({ticket.BacklogItem.WebUrl})", null);
-
+                    
                     Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.BacklogItem.Title}' was just created. ");
 
                     ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
@@ -396,7 +396,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     }
 
                     // Put back encoding of the attachment URL for replace
-                    var descriptionUrl = attachment.UrlPath.Replace("_-", "\\_-\\");
+                    var descriptionUrl = attachment.UrlPath.Replace("_-", @"\_-\");
 
                     formattedDescription = formattedDescription.Replace(descriptionUrl, attachment.AzureDevOpAttachmentReference.Url);
                 }
