@@ -62,7 +62,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             var tickets = new List<Ticket>();
 
             var semaphore = new SemaphoreSlim(10); // Set the maximum number of parallel tasks
-            var tasks = new List<Task<ProcessIssueResult>>();
+            var tasks = new List<Task<ProcessResult>>();
 
             await foreach (var issue in issues)
             {
@@ -86,9 +86,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             return tickets;
         }
 
-        private async Task<ProcessIssueResult> ProcessIssueAsync(Issue issue, string projectUrlSegments, ICollection<Ticket> tickets, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        private async Task<ProcessResult> ProcessIssueAsync(Issue issue, string projectUrlSegments, ICollection<Ticket> tickets, int count, int allIssuesCount, SemaphoreSlim semaphore)
         {
-            var processIssueResult = new ProcessIssueResult();
+            var processResult = new ProcessResult();
 
             try
             {
@@ -112,24 +112,24 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
                 tickets.Add(ticket);
 
-                ConsoleHelper.DrawConsoleProgressBar(count, allIssuesCount);
+                ConsoleHelper.DrawConsoleProgressBar(allIssuesCount);
 
                 Logger.Info($"Retrieved {count} GitLab issues so far, issue #{issue.IssueId} - '{issue.Title}' was just retrieved. ");
 
-                processIssueResult.Count = 1;
+                processResult.Count = 1;
             }
             catch (Exception exception)
             {
                 Logger.Error($"Error getting GitLab issue #{issue.IssueId} - '{issue.Title}', was on issue count: {count}.", exception);
 
-                processIssueResult.ErrorCount = 1;
+                processResult.ErrorCount = 1;
             }
             finally
             {
                 semaphore.Release(); // Release the semaphore when the processing is complete
             }
 
-            return processIssueResult;
+            return processResult;
         }
 
         private void GetNotes(Issue issue, string projectUrlSegments, Ticket ticket)

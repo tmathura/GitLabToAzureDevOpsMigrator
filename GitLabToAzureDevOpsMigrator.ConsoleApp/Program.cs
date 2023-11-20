@@ -44,7 +44,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IConfiguration, ConfigurationRoot>(_ => (ConfigurationRoot)configuration)
-                .AddSingleton<IConsoleHelper, ConsoleHelper>()
+                .AddTransient<IConsoleHelper, ConsoleHelper>()
                 .AddSingleton<IMilestoneBl, MilestoneBl>()
                 .AddSingleton<IIterationBl, IterationBl>()
                 .AddSingleton<IRestClient, RestClient>(_ => restClient)

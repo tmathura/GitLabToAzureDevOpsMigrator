@@ -79,7 +79,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     
                     Logger.Info($"Created {count} Azure DevOp iterations so far, iteration #{createdWorkItemClassificationNode.Id} - '{cycle.Milestone.Title}' was just created. ");
 
-                    ConsoleHelper.DrawConsoleProgressBar(count, cycles.Count);
+                    ConsoleHelper.DrawConsoleProgressBar(cycles.Count);
                 }
                 catch (Exception exception)
                 {
@@ -88,7 +88,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     errorCount++;
                     count--;
 
-                    ConsoleHelper.DrawConsoleProgressBar(count, cycles.Count);
+                    ConsoleHelper.DrawConsoleProgressBar(cycles.Count);
                 }
             }
 

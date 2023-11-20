@@ -13,6 +13,7 @@ using Microsoft.VisualStudio.Services.WebApi.Patch;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using NGitLab.Models;
 using RestSharp;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
@@ -70,7 +71,6 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
         public async Task<List<Ticket>?> CreateWorkItems(List<Cycle>? cycles, List<Ticket>? tickets)
         {
             var count = 0;
-            var errorCount = 0;
 
             if (tickets == null || tickets.Count == 0)
             {
@@ -87,159 +87,183 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
-            var workItemsAdded = new Dictionary<int, WorkItem>();
+            var workItemsAdded = new ConcurrentDictionary<int, WorkItem>();
 
-            foreach (var ticket in tickets
-                         .OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue))
-                         .ThenBy(ticket => ticket.BacklogItem.CreatedAt))
+            var orderedTickets = tickets
+                .OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue))
+                .ThenBy(ticket => ticket.BacklogItem.CreatedAt);
+
+            var semaphore = new SemaphoreSlim(10); // Set the maximum number of parallel tasks
+            var tasks = new List<Task<ProcessResult>>();
+
+            foreach (var ticket in orderedTickets)
             {
+                count++;
+
                 var isEpic = ticket.BacklogItem is BacklogItem<Epic>;
 
-                try
-                {
-                    count++;
+                await semaphore.WaitAsync(); // Wait until the semaphore is available
 
-                    await UploadDescriptionAttachments(ticket.BacklogItem.Id, ticket.BacklogItem.DescriptionAttachments, isEpic);
-
-                    string type;
-                    var descriptionPath = "/fields/System.Description";
-
-
-                    if (isEpic)
-                    {
-                        type = "Epic";
-                    }
-                    else if (ticket.BacklogItem.Labels.Contains("bug"))
-                    {
-                        type = "Bug";
-                        descriptionPath = "/fields/Microsoft.VSTS.TCM.ReproSteps";
-                    }
-                    else
-                    {
-                        type = "User Story";
-                    }
-
-                    var state = ticket.BacklogItem.State switch
-                    {
-                        "opened" => "New",
-                        "closed" => "Closed",
-                        "reopened" => "Active",
-                        _ => "New"
-                    };
-                    
-                    var backlogItemDescription = $"{type} created from GitLab {GetTicketType(isEpic)} [#{ticket.BacklogItem.Id}]({ticket.BacklogItem.WebUrl}){Environment.NewLine}{Environment.NewLine}{ticket.BacklogItem.Description}";
-
-                    // Construct the object containing field values required for the new work item
-                    var jsonPatchDocument = new JsonPatchDocument
-                    {
-                        new()
-                        {
-                            Operation = Operation.Add,
-                            Path = "/fields/System.Title",
-                            Value = ticket.BacklogItem.Title
-                        },new()
-                        {
-                            Operation = Operation.Add,
-                            Path = descriptionPath,
-                            Value = ConvertTextToHtmlAndUpdateAttachmentLinks(backlogItemDescription, ticket.BacklogItem.DescriptionAttachments)
-                        },
-                        new()
-                        {
-                            Operation = Operation.Add,
-                            Path = "/fields/System.State",
-                            Value = "New"
-                        },
-                        new()
-                        {
-                            Operation = Operation.Add,
-                            Path = "/fields/System.Tags",
-                            Value = ticket.BacklogItem.Labels.Any() ? string.Join(";", ticket.BacklogItem.Labels) : null
-                        },
-                        //new()
-                        //{
-                        //    Operation = Operation.Add,
-                        //    Path = "/fields/System.CreatedBy",
-                        //    Value = ticket.Issue.Author.Name
-                        //},
-                        new()
-                        {
-                            Operation = Operation.Add,
-                            Path = "/fields/System.CreatedDate",
-                            Value = ticket.BacklogItem.CreatedAt
-                        }
-                    };
-                    
-                    if (!string.IsNullOrWhiteSpace(ticket.BacklogItem.MilestoneTitle))
-                    {
-                        var iterationName = AppSettings.AzureDevOps.DefaultIterationPath;
-                        var cycle = cycles?.FirstOrDefault(cycle => cycle.Milestone.Title == ticket.BacklogItem.MilestoneTitle);
-
-                        if (cycle?.Iteration != null)
-                        {
-                            iterationName = @$"{iterationName}\{cycle.Iteration.Name}";
-                        }
-
-                        jsonPatchDocument.Add(new JsonPatchOperation
-                        {
-                            Operation = Operation.Add,
-                            Path = "/fields/System.IterationPath",
-                            Value = iterationName
-                        });
-                    }
-
-                    if (ticket.BacklogItem.Weight > 0)
-                    {
-                        jsonPatchDocument.Add(new JsonPatchOperation
-                        {
-                            Operation = Operation.Add,
-                            Path = "/fields/Microsoft.VSTS.Scheduling.StoryPoints",
-                            Value = ticket.BacklogItem.Weight
-                        });
-                    }
-
-                    AddRelatedIssues(ticket.BacklogItem.RelatedIssues, workItemsAdded, jsonPatchDocument);
-
-                    var workItem = await WorkItemTrackingHttpClient.CreateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, type);
-
-                    if (workItem == null)
-                    {
-                        throw new Exception("Work item not created from create.");
-                    }
-
-                    // Update the state of the newly created work item if it is not new
-                    if (state != "New")
-                    {
-                        await UpdateWorkItem(workItem.Id.Value, state, ticket);
-                    }
-
-                    ticket.WorkItem = workItem;
-
-                    workItemsAdded.Add(ticket.BacklogItem.Id, workItem);
-
-                    await AddComments(ticket.BacklogItem.Id, workItem.Id.Value, ticket.Annotations, isEpic);
-                    
-                    Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.BacklogItem.Title}' was just created. ");
-
-                    ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
-                }
-                catch (Exception exception)
-                {
-
-                    Logger.Error($"Error creating Azure DevOps work item for GitLab {GetTicketType(isEpic)} #{ticket.BacklogItem.Id} - '{ticket.BacklogItem.Title}', was on GitLab backlog item count: {count}.", exception);
-
-                    errorCount++;
-                    count--;
-
-                    ConsoleHelper.DrawConsoleProgressBar(count, tickets.Count);
-                }
+                tasks.Add(CreateWorkItem(cycles, ticket, isEpic, workItemsAdded, count, tickets.Count, semaphore));
             }
 
-            var endingProcessMessage = $"Finished creating Azure DevOps work items, there were {count} work items created & there were errors creating {errorCount} work items.";
+            var processedResults = await Task.WhenAll(tasks);
+
+            var processedCount = processedResults.Sum(result => result.Count);
+            var errorCount = processedResults.Sum(result => result.ErrorCount);
+
+            var endingProcessMessage = $"Finished creating Azure DevOps work items, there were {processedCount} work items created & there were errors creating {errorCount} work items.";
 
             Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
             Logger.Info(endingProcessMessage);
 
             return tickets;
+        }
+
+        private async Task<ProcessResult> CreateWorkItem(IEnumerable<Cycle>? cycles, Ticket ticket, bool isEpic, ConcurrentDictionary<int, WorkItem> workItemsAdded, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        {
+            var processResult = new ProcessResult();
+
+            try
+            {
+                await UploadDescriptionAttachments(ticket.BacklogItem.Id, ticket.BacklogItem.DescriptionAttachments, isEpic);
+
+                string type;
+                var descriptionPath = "/fields/System.Description";
+                
+                if (isEpic)
+                {
+                    type = "Epic";
+                }
+                else if (ticket.BacklogItem.Labels.Contains("bug"))
+                {
+                    type = "Bug";
+                    descriptionPath = "/fields/Microsoft.VSTS.TCM.ReproSteps";
+                }
+                else
+                {
+                    type = "User Story";
+                }
+
+                var state = ticket.BacklogItem.State switch
+                {
+                    "opened" => "New",
+                    "closed" => "Closed",
+                    "reopened" => "Active",
+                    _ => "New"
+                };
+
+                var backlogItemDescription = $"{type} created from GitLab {GetTicketType(isEpic)} [#{ticket.BacklogItem.Id}]({ticket.BacklogItem.WebUrl}){Environment.NewLine}{Environment.NewLine}{ticket.BacklogItem.Description}";
+
+                // Construct the object containing field values required for the new work item
+                var jsonPatchDocument = new JsonPatchDocument
+                {
+                    new()
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.Title",
+                        Value = ticket.BacklogItem.Title
+                    },
+                    new()
+                    {
+                        Operation = Operation.Add,
+                        Path = descriptionPath,
+                        Value = ConvertTextToHtmlAndUpdateAttachmentLinks(backlogItemDescription,
+                            ticket.BacklogItem.DescriptionAttachments)
+                    },
+                    new()
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.State",
+                        Value = "New"
+                    },
+                    new()
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.Tags",
+                        Value = ticket.BacklogItem.Labels.Any() ? string.Join(";", ticket.BacklogItem.Labels) : null
+                    },
+                    //new()
+                    //{
+                    //    Operation = Operation.Add,
+                    //    Path = "/fields/System.CreatedBy",
+                    //    Value = ticket.Issue.Author.Name
+                    //},
+                    new()
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.CreatedDate",
+                        Value = ticket.BacklogItem.CreatedAt
+                    }
+                };
+
+                if (!string.IsNullOrWhiteSpace(ticket.BacklogItem.MilestoneTitle))
+                {
+                    var iterationName = AppSettings.AzureDevOps.DefaultIterationPath;
+                    var cycle = cycles?.FirstOrDefault(cycle => cycle.Milestone.Title == ticket.BacklogItem.MilestoneTitle);
+
+                    if (cycle?.Iteration != null)
+                    {
+                        iterationName = @$"{iterationName}\{cycle.Iteration.Name}";
+                    }
+
+                    jsonPatchDocument.Add(new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.IterationPath",
+                        Value = iterationName
+                    });
+                }
+
+                if (ticket.BacklogItem.Weight > 0)
+                {
+                    jsonPatchDocument.Add(new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/Microsoft.VSTS.Scheduling.StoryPoints",
+                        Value = ticket.BacklogItem.Weight
+                    });
+                }
+
+                AddRelatedIssues(ticket.BacklogItem.RelatedIssues, workItemsAdded, jsonPatchDocument);
+
+                var workItem = await WorkItemTrackingHttpClient.CreateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, type);
+
+                if (workItem == null)
+                {
+                    throw new Exception("Work item not created from create.");
+                }
+
+                // Update the state of the newly created work item if it is not new
+                if (state != "New")
+                {
+                    await UpdateWorkItem(workItem.Id.Value, state, ticket);
+                }
+
+                ticket.WorkItem = workItem;
+
+                workItemsAdded.AddOrUpdate(ticket.BacklogItem.Id, workItem, (_, _) => workItem);
+
+                await AddComments(ticket.BacklogItem.Id, workItem.Id.Value, ticket.Annotations, isEpic);
+
+                ConsoleHelper.DrawConsoleProgressBar(allIssuesCount);
+
+                Logger.Info($"Created {count} Azure DevOp work items so far, work item #{workItem.Id} - '{ticket.BacklogItem.Title}' was just created. ");
+
+                processResult.Count = 1;
+            }
+            catch (Exception exception)
+            {
+                Logger.Error($"Error creating Azure DevOps work item for GitLab {GetTicketType(isEpic)} #{ticket.BacklogItem.Id} - '{ticket.BacklogItem.Title}', was on GitLab backlog item count: {count}.", exception);
+
+                processResult.ErrorCount = 1;
+            }
+            finally
+            {
+                semaphore.Release(); // Release the semaphore when the processing is complete
+            }
+
+            return processResult;
         }
 
         private async Task UpdateWorkItem(int workItemId, string state, Ticket ticket)

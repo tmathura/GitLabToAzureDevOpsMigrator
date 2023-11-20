@@ -3,5 +3,5 @@
 public interface IConsoleHelper
 {
     void DrawConsoleProgressCount(int count);
-    void DrawConsoleProgressBar(int progress, int total);
+    void DrawConsoleProgressBar(int total);
 }
