@@ -99,7 +99,7 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
             }
         }
 
-        public string Milestone
+        public string MilestoneTitle
         {
             get
             {
@@ -138,7 +138,20 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
             }
         }
 
-        public List<Attachment> Attachments { get; set; } = new();
+        public string WebUrl
+        {
+            get
+            {
+                return Item switch
+                {
+                    Issue issue => issue.WebUrl,
+                    Epic epic => epic.WebUrl,
+                    _ => throw new NotImplementedException()
+                };
+            }
+        }
+
+        public List<Attachment> DescriptionAttachments { get; set; } = new();
         public List<Issue> RelatedIssues { get; set; } = new();
     }
 }

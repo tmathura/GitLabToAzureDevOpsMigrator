@@ -20,7 +20,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
         
         public List<Cycle>? Get()
         {
-            const string startingProcessMessage = "Started getting GitLab milestones.";
+            var startingProcessMessage = $"{Environment.NewLine}Started getting GitLab milestones.";
 
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);

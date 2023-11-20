@@ -10,10 +10,11 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
         string State { get; }
         string Title { get; }
         string Description { get; }
-        string Milestone { get; }
+        string MilestoneTitle { get; }
         int Weight { get; }
         DateTime ClosedAt { get; }
-        List<Attachment> Attachments { get; }
+        string WebUrl { get; }
+        List<Attachment> DescriptionAttachments { get; }
         List<Issue> RelatedIssues { get; }
     }
 }

@@ -98,7 +98,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                 {
                     if (!string.IsNullOrWhiteSpace(issue.Description))
                     {
-                        AttachmentHelper.GetAttachmentInString(issue.Description, projectUrlSegments, ticket.BacklogItem.Attachments);
+                        AttachmentHelper.GetAttachmentInString(issue.Description, projectUrlSegments, ticket.BacklogItem.DescriptionAttachments);
                     }
                 }
                 catch (Exception exception)

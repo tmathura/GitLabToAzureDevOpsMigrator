@@ -33,7 +33,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
         public async Task<List<Ticket>?> Get()
         {
-            const string startingProcessMessage = "Started getting GitLab epics.";
+            var startingProcessMessage = $"{Environment.NewLine}Started getting GitLab epics.";
 
             Console.WriteLine(startingProcessMessage);
             Logger.Info(startingProcessMessage);
@@ -59,7 +59,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                         {
                             if (!string.IsNullOrWhiteSpace(epic.Description))
                             {
-                                AttachmentHelper.GetAttachmentInString(epic.Description, projectUrlSegments, ticket.BacklogItem.Attachments);
+                                AttachmentHelper.GetAttachmentInString(epic.Description, projectUrlSegments, ticket.BacklogItem.DescriptionAttachments);
                             }
                         }
                         catch (Exception exception)
