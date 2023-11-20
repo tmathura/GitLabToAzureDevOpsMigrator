@@ -74,9 +74,9 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 stopwatch.Stop();
 
                 var elapsed = stopwatch.Elapsed;
-                var elapsedTimeMessage = $"{Environment.NewLine}Time taken to migrate: {elapsed.Hours} hours, {elapsed.Minutes} minutes, {elapsed.Seconds} seconds, {elapsed.Milliseconds} milliseconds";
+                var elapsedTimeMessage = $"Time taken to migrate: {elapsed.Hours} hours, {elapsed.Minutes} minutes, {elapsed.Seconds} seconds, {elapsed.Milliseconds} milliseconds";
                 
-                Console.WriteLine(elapsedTimeMessage);
+                Console.WriteLine($"{Environment.NewLine}{elapsedTimeMessage}");
                 Logger.Info(elapsedTimeMessage);
             }
             catch (Exception exception)

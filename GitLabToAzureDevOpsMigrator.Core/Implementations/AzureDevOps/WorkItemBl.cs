@@ -74,17 +74,17 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
             if (tickets == null || tickets.Count == 0)
             {
-                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps work items encountered a problem, no GitLab backlog items to create from.";
+                const string noTicketsMessage = "Creating Azure DevOps work items encountered a problem, no GitLab backlog items to create from.";
 
-                Console.WriteLine(noTicketsMessage);
+                Console.WriteLine($"{Environment.NewLine}{noTicketsMessage}");
                 Logger.Info(noTicketsMessage);
 
                 return null;
             }
 
-            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps work items, there are {tickets.Count} GitLab backlog items to create from.";
+            var startingProcessMessage = $"Started creating Azure DevOps work items, there are {tickets.Count} GitLab backlog items to create from.";
 
-            Console.WriteLine(startingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
             var workItemsAdded = new Dictionary<int, WorkItem>();
@@ -233,9 +233,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 }
             }
 
-            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps work items, there were {count} work items created & there were errors creating {errorCount} work items.";
+            var endingProcessMessage = $"Finished creating Azure DevOps work items, there were {count} work items created & there were errors creating {errorCount} work items.";
 
-            Console.WriteLine(endingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
             Logger.Info(endingProcessMessage);
 
             return tickets;

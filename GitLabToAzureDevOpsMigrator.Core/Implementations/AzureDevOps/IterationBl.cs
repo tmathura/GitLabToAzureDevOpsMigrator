@@ -36,17 +36,17 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
             if (cycles == null || cycles.Count == 0)
             {
-                var noTicketsMessage = $"{Environment.NewLine}Creating Azure DevOps iterations encountered a problem, no milestones to create from.";
+                const string noCyclesMessage = "Creating Azure DevOps iterations encountered a problem, no milestones to create from.";
 
-                Console.WriteLine(noTicketsMessage);
-                Logger.Info(noTicketsMessage);
+                Console.WriteLine($"{Environment.NewLine}{noCyclesMessage}");
+                Logger.Info(noCyclesMessage);
 
                 return null;
             }
 
-            var startingProcessMessage = $"{Environment.NewLine}Started creating Azure DevOps iterations, there are {cycles.Count} milestones to create from.";
+            var startingProcessMessage = $"Started creating Azure DevOps iterations, there are {cycles.Count} GitLab milestones to create from.";
 
-            Console.WriteLine(startingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
             foreach (var cycle in cycles.OrderBy(GetCycleStartDate))
@@ -92,9 +92,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 }
             }
 
-            var endingProcessMessage = $"{Environment.NewLine}Finished creating Azure DevOps iterations, there were {count} iterations created & there were errors creating {errorCount} iterations.";
+            var endingProcessMessage = $"Finished creating Azure DevOps iterations, there were {count} iterations created & there were errors creating {errorCount} iterations.";
 
-            Console.WriteLine(endingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
             Logger.Info(endingProcessMessage);
 
             return cycles;

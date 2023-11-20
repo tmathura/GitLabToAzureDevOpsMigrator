@@ -20,9 +20,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
         
         public List<Cycle>? Get()
         {
-            var startingProcessMessage = $"{Environment.NewLine}Started getting GitLab milestones.";
+            const string startingProcessMessage = "Started getting GitLab milestones.";
 
-            Console.WriteLine(startingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
             try
@@ -52,9 +52,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                     }
                 }
 
-                var endingProcessMessage = $"{Environment.NewLine}Finished getting GitLab milestones, there were {count} milestones retrieved & there were errors getting {errorCount} milestones.";
+                var endingProcessMessage = $"Finished getting GitLab milestones, there were {count} milestones retrieved & there were errors getting {errorCount} milestones.";
 
-                Console.WriteLine(endingProcessMessage);
+                Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
                 Logger.Info(endingProcessMessage);
 
                 return cycles;

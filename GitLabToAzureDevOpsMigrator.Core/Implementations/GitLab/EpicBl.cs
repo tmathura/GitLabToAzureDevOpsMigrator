@@ -33,9 +33,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
         public async Task<List<Ticket>?> Get()
         {
-            var startingProcessMessage = $"{Environment.NewLine}Started getting GitLab epics.";
+            const string startingProcessMessage = "Started getting GitLab epics.";
 
-            Console.WriteLine(startingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
             try
@@ -85,9 +85,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                     }
                 }
 
-                var endingProcessMessage = $"{Environment.NewLine}Finished getting GitLab epics, there were {count} epics retrieved & there were errors getting {errorCount} epics.";
+                var endingProcessMessage = $"Finished getting GitLab epics, there were {count} epics retrieved & there were errors getting {errorCount} epics.";
 
-                Console.WriteLine(endingProcessMessage);
+                Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
                 Logger.Info(endingProcessMessage);
 
                 return tickets;

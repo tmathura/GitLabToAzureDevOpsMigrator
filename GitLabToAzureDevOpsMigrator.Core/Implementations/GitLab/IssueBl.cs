@@ -39,9 +39,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
             if (statisticsRoot == null)
             {
-                var noStatisticsMessage = $"{Environment.NewLine}Getting GitLab issues encountered a problem, StatisticsRoot is null.";
+                const string noStatisticsMessage = "Getting GitLab issues encountered a problem, StatisticsRoot is null.";
 
-                Console.WriteLine(noStatisticsMessage);
+                Console.WriteLine($"{Environment.NewLine}{noStatisticsMessage}");
                 Logger.Info(noStatisticsMessage);
 
                 return null;
@@ -49,9 +49,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 
             var allIssuesCount = statisticsRoot.Statistics.Counts.All;
 
-            var startingProcessMessage = $"{Environment.NewLine}Started getting GitLab issues, there are {allIssuesCount} issues to retrieve.";
+            var startingProcessMessage = $"Started getting GitLab issues, there are {allIssuesCount} issues to retrieve.";
 
-            Console.WriteLine(startingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
             var projectUrlSegments = $"/{GitLabSettings.GroupName}/{GitLabSettings.ProjectName}";
@@ -78,9 +78,9 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             var processedCount = processedResults.Sum(result => result.Count);
             var errorCount = processedResults.Sum(result => result.ErrorCount);
 
-            var endingProcessMessage = $"{Environment.NewLine}Finished getting GitLab issues, there were {processedCount} issues retrieved & there were errors getting {errorCount} issues.";
+            var endingProcessMessage = $"Finished getting GitLab issues, there were {processedCount} issues retrieved & there were errors getting {errorCount} issues.";
 
-            Console.WriteLine(endingProcessMessage);
+            Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
             Logger.Info(endingProcessMessage);
 
             return tickets;
