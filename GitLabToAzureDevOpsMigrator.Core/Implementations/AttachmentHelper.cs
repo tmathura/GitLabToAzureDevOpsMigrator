@@ -22,6 +22,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations
                 {
                     continue;
                 }
+                // Replace encoding of the attachment URL
+                urlPath = urlPath.Replace("\\_-\\", "_-");
 
                 var attachment = new Attachment(match.Groups[1].Value, urlPath, urlPath.Replace(projectUrlSegments, string.Empty), null);
 

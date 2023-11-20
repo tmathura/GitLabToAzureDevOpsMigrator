@@ -126,6 +126,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         "reopened" => "Active",
                         _ => "New"
                     };
+
                     // Construct the object containing field values required for the new work item
                     var jsonPatchDocument = new JsonPatchDocument
                     {
@@ -394,7 +395,10 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         continue;
                     }
 
-                    formattedDescription = formattedDescription.Replace(attachment.UrlPath, attachment.AzureDevOpAttachmentReference.Url);
+                    // Put back encoding of the attachment URL for replace
+                    var descriptionUrl = attachment.UrlPath.Replace("_-", "\\_-\\");
+
+                    formattedDescription = formattedDescription.Replace(descriptionUrl, attachment.AzureDevOpAttachmentReference.Url);
                 }
             }
 
