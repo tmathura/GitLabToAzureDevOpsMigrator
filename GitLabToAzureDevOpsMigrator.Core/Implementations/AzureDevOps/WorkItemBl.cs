@@ -192,7 +192,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     _ => "New"
                 };
 
-                var backlogItemDescription = $"{type} created from GitLab {GetTicketType(isEpic)} [#{ticket.BacklogItem.Id}]({ticket.BacklogItem.WebUrl}){Environment.NewLine}{Environment.NewLine}{ticket.BacklogItem.Description}";
+                var backlogItemDescription = $"**{type} created from GitLab {GetTicketType(isEpic)} [#{ticket.BacklogItem.Id}]({ticket.BacklogItem.WebUrl})**{Environment.NewLine}{Environment.NewLine}{ticket.BacklogItem.Description}";
 
                 // Construct the object containing field values required for the new work item
                 var jsonPatchDocument = new JsonPatchDocument
@@ -407,7 +407,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     await UploadAttachment(backlogItemId, attachment, isEpic);
                 }
 
-                var comment = await AddComment(backlogItemId, workItemId, isEpic, $"{annotation.Note.CreatedBy} added note on: {annotation.Note.CreatedAt}{Environment.NewLine}{Environment.NewLine}{annotation.Note.Body}", annotation.NotesAttachments);
+                var comment = await AddComment(backlogItemId, workItemId, isEpic, $"**{annotation.Note.CreatedBy} added note on {annotation.Note.CreatedAt}:**{Environment.NewLine}{Environment.NewLine}{annotation.Note.Body}", annotation.NotesAttachments);
 
                 if (comment != null)
                 {
