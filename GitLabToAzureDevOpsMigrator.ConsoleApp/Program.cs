@@ -6,6 +6,8 @@ using GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.AzureDevOps;
 using GitLabToAzureDevOpsMigrator.Core.Interfaces.GitLab;
+using GitLabToAzureDevOpsMigrator.Domain.Interfaces;
+using GitLabToAzureDevOpsMigrator.Domain.Models;
 using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations;
 using GitLabToAzureDevOpsMigrator.GitLabWrapper.Interfaces;
@@ -17,7 +19,6 @@ using NGitLab;
 using NGitLab.Impl;
 using RestSharp;
 using RestSharp.Serializers.NewtonsoftJson;
-using System.Diagnostics;
 using System.Reflection;
 
 namespace GitLabToAzureDevOpsMigrator.ConsoleApp
@@ -44,6 +45,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             
             var serviceProvider = new ServiceCollection()
                 .AddSingleton<IConfiguration, ConfigurationRoot>(_ => (ConfigurationRoot)configuration)
+                .AddSingleton<IStopwatchWrapper, StopwatchWrapper>()
                 .AddTransient<IConsoleHelper, ConsoleHelper>()
                 .AddSingleton<IMilestoneBl, MilestoneBl>()
                 .AddSingleton<IIterationBl, IterationBl>()
@@ -55,6 +57,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 .AddSingleton<IProjectIssueNoteClient, ProjectIssueNoteClient>(services => services.GetRequiredService<IGitLabClient>().GetProjectIssueNoteClient(appSettings.GitLab.ProjectId) as ProjectIssueNoteClient ?? throw new Exception("ProjectIssueNoteClient is null."))
                 .AddSingleton<IIssueClient, IssueClient>(services => services.GetRequiredService<IGitLabClient>().Issues as IssueClient ?? throw new Exception("IssueClient is null."))
                 .AddSingleton<IMilestoneClient, MilestoneClient>(services => services.GetRequiredService<IGitLabClient>().GetGroupMilestone(appSettings.GitLab.GroupId) as MilestoneClient ?? throw new Exception("MilestoneClient is null."))
+                .AddSingleton<IMergeRequestClient, MergeRequestClient>(services => services.GetRequiredService<IGitLabClient>().GetMergeRequest(appSettings.GitLab.GroupId) as MergeRequestClient ?? throw new Exception("MergeRequestClient is null."))
                 .AddSingleton<IIssueBl, IssueBl>()
                 .AddSingleton<IEpicBl, EpicBl>()
                 .AddSingleton<IVssConnection, VssConnectionWrapper>(_ => new VssConnectionWrapper(new Uri(appSettings.AzureDevOps.Url), vssBasicCredential))
@@ -64,7 +67,8 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
 
             try
             {
-                var stopwatch = new Stopwatch();
+                var stopwatch = serviceProvider.GetRequiredService<IStopwatchWrapper>();
+
                 stopwatch.Start();
 
                 var migrateBl = serviceProvider.GetRequiredService<IMigrateBl>();

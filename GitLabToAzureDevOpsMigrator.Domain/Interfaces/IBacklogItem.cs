@@ -1,6 +1,7 @@
-﻿using NGitLab.Models;
+﻿using GitLabToAzureDevOpsMigrator.Domain.Models;
+using NGitLab.Models;
 
-namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
+namespace GitLabToAzureDevOpsMigrator.Domain.Interfaces
 {
     public interface IBacklogItem
     {

@@ -1,4 +1,4 @@
-using GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
+using GitLabToAzureDevOpsMigrator.Domain.Interfaces;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Domain.Models

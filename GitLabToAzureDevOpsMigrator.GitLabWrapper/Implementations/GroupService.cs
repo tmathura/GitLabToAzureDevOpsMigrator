@@ -15,7 +15,7 @@ namespace GitLabToAzureDevOpsMigrator.GitLabWrapper.Implementations
         /// <inheritdoc />
         public async Task<List<Note>?> GetEpicNotes(int groupId, int epicId)
         {
-            var url = $"api/v4//groups/{groupId}/epics/{epicId}/notes";
+            var url = $"api/v4/groups/{groupId}/epics/{epicId}/notes";
 
             var request = new RestRequest(url);
             var response = await RestSharpClient.ExecuteAsync<List<Note>>(request);

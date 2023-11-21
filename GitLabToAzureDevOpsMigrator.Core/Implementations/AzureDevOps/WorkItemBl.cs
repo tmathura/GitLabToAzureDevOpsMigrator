@@ -342,7 +342,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     await UploadAttachment(backlogItemId, attachment, isEpic);
                 }
 
-                var comment = await AddComment(backlogItemId, workItemId, isEpic, annotation.Note.Body, annotation.NotesAttachments);
+                var comment = await AddComment(backlogItemId, workItemId, isEpic, $"{annotation.Note.CreatedBy} added note on: {annotation.Note.CreatedAt}{Environment.NewLine}{annotation.Note.Body}", annotation.NotesAttachments);
 
                 if (comment != null)
                 {

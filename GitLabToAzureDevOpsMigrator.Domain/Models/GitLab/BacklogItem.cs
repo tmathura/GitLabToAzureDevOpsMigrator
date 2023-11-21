@@ -1,4 +1,5 @@
-﻿using NGitLab.Models;
+﻿using GitLabToAzureDevOpsMigrator.Domain.Interfaces;
+using NGitLab.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
 {

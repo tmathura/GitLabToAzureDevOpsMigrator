@@ -1,4 +1,5 @@
-﻿using NGitLab.Models;
+﻿using GitLabToAzureDevOpsMigrator.Domain.Interfaces;
+using NGitLab.Models;
 
 namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
 {
@@ -29,6 +30,19 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
                 {
                     ProjectIssueNote projectIssueNote => projectIssueNote.CreatedAt,
                     EpicNote.Note epicNote => epicNote.CreatedAt,
+                    _ => throw new NotImplementedException()
+                };
+            }
+        }
+
+        public string CreatedBy
+        {
+            get
+            {
+                return Note switch
+                {
+                    ProjectIssueNote projectIssueNote => projectIssueNote.Author.Name,
+                    EpicNote.Note epicNote => epicNote.Author.Name,
                     _ => throw new NotImplementedException()
                 };
             }
