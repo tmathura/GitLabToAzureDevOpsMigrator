@@ -18,5 +18,8 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Interfaces
         List<Attachment> DescriptionAttachments { get; }
         List<Issue> RelatedIssues { get; }
         List<MergeRequest> MergeRequests { get; }
+        string AuthorName { get; }
+        string AssigneeName { get; }
+        string ClosedByName { get; }
     }
 }

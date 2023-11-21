@@ -11,6 +11,7 @@ using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
+using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.VisualStudio.Services.WebApi.Patch;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using NGitLab.Models;
@@ -31,6 +32,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
         private WorkItemTrackingHttpClient WorkItemTrackingHttpClient { get; }
         private ProjectHttpClient ProjectHttpClient { get; }
         private GitHttpClient GitHttpClient { get; }
+        private TeamHttpClient TeamHttpClient { get; }
         private Guid? ProjectId { get; set; }
         private Guid? RepositoryId { get; set; }
 
@@ -52,6 +54,10 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             var gitHttpClient = vssConnection.GetClient<GitHttpClient>();
 
             GitHttpClient = gitHttpClient ?? throw new Exception("GitHttpClient is null.");
+
+            var teamHttpClient = vssConnection.GetClient<TeamHttpClient>();
+
+            TeamHttpClient = teamHttpClient ?? throw new Exception("TeamHttpClient is null.");
         }
 
         public async Task<WorkItem?> GetWorkItem(int id)
@@ -128,6 +134,28 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 throw;
             }
 
+            var allTeamMembers = new List<TeamMember>();
+
+            try
+            {
+                var teams = await TeamHttpClient.GetTeamsAsync(ProjectId.ToString());
+
+                foreach (var team in teams)
+                {
+                    var teamMembers = await TeamHttpClient.GetTeamMembersWithExtendedPropertiesAsync(ProjectId.ToString(), team.Id.ToString());
+
+                    if (teamMembers != null)
+                    {
+                        allTeamMembers.AddRange(teamMembers);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error($"Creating Azure DevOps work items encountered a problem, could not get all team members: {exception.Message}", exception);
+                throw;
+            }
+
             var workItemsAdded = new ConcurrentDictionary<int, WorkItem>();
 
             var orderedTickets = tickets.OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue)).ThenBy(ticket => ticket.BacklogItem.CreatedAt);
@@ -143,7 +171,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
                 await semaphore.WaitAsync(); // Wait until the semaphore is available
 
-                tasks.Add(CreateWorkItem(cycles, ticket, isEpic, workItemsAdded, count, tickets.Count, semaphore));
+                tasks.Add(CreateWorkItem(cycles, ticket, isEpic, workItemsAdded, count, tickets.Count, allTeamMembers, semaphore));
             }
 
             var processedResults = await Task.WhenAll(tasks);
@@ -159,7 +187,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             return tickets;
         }
 
-        private async Task<ProcessResult> CreateWorkItem(IEnumerable<Cycle>? cycles, Ticket ticket, bool isEpic, ConcurrentDictionary<int, WorkItem> workItemsAdded, int count, int allIssuesCount, SemaphoreSlim semaphore)
+        private async Task<ProcessResult> CreateWorkItem(IEnumerable<Cycle>? cycles, Ticket ticket, bool isEpic, ConcurrentDictionary<int, WorkItem> workItemsAdded, int count, int allIssuesCount, List<TeamMember> allTeamMembers, SemaphoreSlim semaphore)
         {
             var processResult = new ProcessResult();
 
@@ -221,12 +249,6 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         Path = "/fields/System.Tags",
                         Value = ticket.BacklogItem.Labels.Any() ? string.Join(";", ticket.BacklogItem.Labels) : null
                     },
-                    //new()
-                    //{
-                    //    Operation = Operation.Add,
-                    //    Path = "/fields/System.CreatedBy",
-                    //    Value = ticket.Issue.Author.Name
-                    //},
                     new()
                     {
                         Operation = Operation.Add,
@@ -234,6 +256,30 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                         Value = ticket.BacklogItem.CreatedAt
                     }
                 };
+
+                foreach (var teamMember in allTeamMembers)
+                {
+                    if (teamMember.Identity.DisplayName == ticket.BacklogItem.AuthorName)
+                    {
+                        jsonPatchDocument.Add(new JsonPatchOperation
+                        {
+                            Operation = Operation.Add,
+                            Path = "/fields/System.CreatedBy",
+                            Value = ticket.BacklogItem.AuthorName
+                        });
+                    }
+
+                    if (teamMember.Identity.DisplayName == ticket.BacklogItem.AssigneeName)
+                    {
+                        jsonPatchDocument.Add(new JsonPatchOperation
+                        {
+                            Operation = Operation.Add,
+                            Path = "/fields/System.AssignedTo",
+                            Value = ticket.BacklogItem.AssigneeName
+                        });
+                    }
+
+                }
 
                 if (!string.IsNullOrWhiteSpace(ticket.BacklogItem.MilestoneTitle))
                 {
@@ -277,7 +323,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 // Update the state of the newly created work item if it is not new
                 if (state != "New")
                 {
-                    await UpdateWorkItem(workItem.Id.Value, state, ticket);
+                    await UpdateWorkItem(workItem.Id.Value, state, ticket, allTeamMembers);
                 }
 
                 ticket.WorkItem = workItem;
@@ -306,7 +352,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             return processResult;
         }
 
-        private async Task UpdateWorkItem(int workItemId, string state, Ticket ticket)
+        private async Task UpdateWorkItem(int workItemId, string state, Ticket ticket, IEnumerable<TeamMember> allTeamMembers)
         {
             var jsonPatchDocument = new JsonPatchDocument
             {
@@ -320,12 +366,15 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 
             if (state == "Closed")
             {
-                //jsonPatchDocument.Add(new JsonPatchOperation
-                //{
-                //    Operation = Operation.Add,
-                //    Path = "/fields/Microsoft.VSTS.Common.ClosedBy",
-                //    Value = ticket.Issue.ClosedBy.Name
-                //});
+                if (allTeamMembers.Any(teamMember => teamMember.Identity.DisplayName == ticket.BacklogItem.ClosedByName))
+                {
+                    jsonPatchDocument.Add(new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/Microsoft.VSTS.Common.ClosedBy",
+                        Value = ticket.BacklogItem.ClosedByName
+                    });
+                }
 
                 jsonPatchDocument.Add(new JsonPatchOperation
                 {

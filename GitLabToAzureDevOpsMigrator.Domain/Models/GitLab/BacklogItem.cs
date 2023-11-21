@@ -152,6 +152,45 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
             }
         }
 
+        public string AuthorName
+        {
+            get
+            {
+                return Item switch
+                {
+                    Issue issue => issue.Author.Name,
+                    Epic => string.Empty,
+                    _ => throw new NotImplementedException()
+                };
+            }
+        }
+
+        public string AssigneeName
+        {
+            get
+            {
+                return Item switch
+                {
+                    Issue issue => issue.Assignee?.Name ?? string.Empty,
+                    Epic => string.Empty,
+                    _ => throw new NotImplementedException()
+                };
+            }
+        }
+
+        public string ClosedByName
+        {
+            get
+            {
+                return Item switch
+                {
+                    Issue issue => issue.ClosedBy.Name,
+                    Epic => string.Empty,
+                    _ => throw new NotImplementedException()
+                };
+            }
+        }
+
         public List<Attachment> DescriptionAttachments { get; set; } = new();
         public List<Issue> RelatedIssues { get; set; } = new();
         public List<MergeRequest> MergeRequests { get; set; } = new();

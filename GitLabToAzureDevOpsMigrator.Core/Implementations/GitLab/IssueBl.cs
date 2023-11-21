@@ -150,7 +150,6 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                             // Use a regular expression to match numbers at the end of the string
                             var match = Regex.Match(note.Body, @"\d+$");
 
-                            // Check if a match is found
                             if (match.Success && int.TryParse(match.Value, out var mergeRequestId))
                             {
                                 try
