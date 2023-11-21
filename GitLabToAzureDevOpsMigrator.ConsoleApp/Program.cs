@@ -34,9 +34,9 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
             var appSettings = new AppSettings();
             configuration.Bind(appSettings);
 
-            var repository = LogManager.GetRepository(Assembly.GetEntryAssembly());
+            var loggerRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
             var fileInfo = new FileInfo("log4net.config");
-            log4net.Config.XmlConfigurator.Configure(repository, fileInfo);
+            log4net.Config.XmlConfigurator.Configure(loggerRepository, fileInfo);
             
             var restClient = new RestClient($"{appSettings.GitLab.Url}", configureSerialization: serializerConfig => serializerConfig.UseSerializer(() => new JsonNetSerializer()));
             restClient.AddDefaultHeader("PRIVATE-TOKEN", appSettings.GitLab.AccessToken);
@@ -57,7 +57,7 @@ namespace GitLabToAzureDevOpsMigrator.ConsoleApp
                 .AddSingleton<IProjectIssueNoteClient, ProjectIssueNoteClient>(services => services.GetRequiredService<IGitLabClient>().GetProjectIssueNoteClient(appSettings.GitLab.ProjectId) as ProjectIssueNoteClient ?? throw new Exception("ProjectIssueNoteClient is null."))
                 .AddSingleton<IIssueClient, IssueClient>(services => services.GetRequiredService<IGitLabClient>().Issues as IssueClient ?? throw new Exception("IssueClient is null."))
                 .AddSingleton<IMilestoneClient, MilestoneClient>(services => services.GetRequiredService<IGitLabClient>().GetGroupMilestone(appSettings.GitLab.GroupId) as MilestoneClient ?? throw new Exception("MilestoneClient is null."))
-                .AddSingleton<IMergeRequestClient, MergeRequestClient>(services => services.GetRequiredService<IGitLabClient>().GetMergeRequest(appSettings.GitLab.GroupId) as MergeRequestClient ?? throw new Exception("MergeRequestClient is null."))
+                .AddSingleton<IMergeRequestClient, MergeRequestClient>(services => services.GetRequiredService<IGitLabClient>().GetMergeRequest(appSettings.GitLab.ProjectId) as MergeRequestClient ?? throw new Exception("MergeRequestClient is null."))
                 .AddSingleton<IIssueBl, IssueBl>()
                 .AddSingleton<IEpicBl, EpicBl>()
                 .AddSingleton<IVssConnection, VssConnectionWrapper>(_ => new VssConnectionWrapper(new Uri(appSettings.AzureDevOps.Url), vssBasicCredential))

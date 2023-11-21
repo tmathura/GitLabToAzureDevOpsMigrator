@@ -7,6 +7,8 @@ using GitLabToAzureDevOpsMigrator.Domain.Models.Settings;
 using log4net;
 using Markdig;
 using Microsoft.Extensions.Configuration;
+using Microsoft.TeamFoundation.Core.WebApi;
+using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.WebApi.Patch;
@@ -15,6 +17,8 @@ using NGitLab.Models;
 using RestSharp;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using Attachment = GitLabToAzureDevOpsMigrator.Domain.Models.Attachment;
+using Comment = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.Comment;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
 {
@@ -25,6 +29,10 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
         private IRestClient RestSharpClient { get; }
         private AppSettings AppSettings { get; } = new();
         private WorkItemTrackingHttpClient WorkItemTrackingHttpClient { get; }
+        private ProjectHttpClient ProjectHttpClient { get; }
+        private GitHttpClient GitHttpClient { get; }
+        private Guid? ProjectId { get; set; }
+        private Guid? RepositoryId { get; set; }
 
         public WorkItemBl(IConfiguration configuration, IConsoleHelper consoleHelper, IVssConnection vssConnection, IRestClient restSharpClient)
         {
@@ -36,6 +44,14 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             var workItemTrackingHttpClient = vssConnection.GetClient<WorkItemTrackingHttpClient>();
 
             WorkItemTrackingHttpClient = workItemTrackingHttpClient ?? throw new Exception("WorkItemTrackingHttpClient is null.");
+
+            var projectHttpClient = vssConnection.GetClient<ProjectHttpClient>();
+
+            ProjectHttpClient = projectHttpClient ?? throw new Exception("WorkIProjectHttpClienttemTrackingHttpClient is null.");
+
+            var gitHttpClient = vssConnection.GetClient<GitHttpClient>();
+
+            GitHttpClient = gitHttpClient ?? throw new Exception("GitHttpClient is null.");
         }
 
         public async Task<WorkItem?> GetWorkItem(int id)
@@ -87,11 +103,34 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
             Logger.Info(startingProcessMessage);
 
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(AppSettings.AzureDevOps.ProjectName) && !string.IsNullOrWhiteSpace(AppSettings.AzureDevOps.RepositoryName))
+                {
+                    var projects = await ProjectHttpClient.GetProjects();
+                    var project = projects.FirstOrDefault(x => x.Name == AppSettings.AzureDevOps.ProjectName);
+                    if (project != null)
+                    {
+                        var repositories = await GitHttpClient.GetRepositoriesAsync(project.Id.ToString());
+                        var repository = repositories.First(x => x.Name == AppSettings.AzureDevOps.RepositoryName);
+
+                        if (repository != null)
+                        {
+                            ProjectId = project.Id;
+                            RepositoryId = repository.Id;
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error($"Creating Azure DevOps work items encountered a problem, could not get {nameof(AppSettings.AzureDevOps.ProjectName)} & {nameof(AppSettings.AzureDevOps.RepositoryName)}: {exception.Message}", exception);
+                throw;
+            }
+
             var workItemsAdded = new ConcurrentDictionary<int, WorkItem>();
 
-            var orderedTickets = tickets
-                .OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue))
-                .ThenBy(ticket => ticket.BacklogItem.CreatedAt);
+            var orderedTickets = tickets.OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue)).ThenBy(ticket => ticket.BacklogItem.CreatedAt);
 
             var semaphore = new SemaphoreSlim(10); // Set the maximum number of parallel tasks
             var tasks = new List<Task<ProcessResult>>();
@@ -168,8 +207,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     {
                         Operation = Operation.Add,
                         Path = descriptionPath,
-                        Value = ConvertTextToHtmlAndUpdateAttachmentLinks(backlogItemDescription,
-                            ticket.BacklogItem.DescriptionAttachments)
+                        Value = ConvertTextToHtmlAndUpdateAttachmentLinks(backlogItemDescription, ticket.BacklogItem.DescriptionAttachments)
                     },
                     new()
                     {
@@ -226,6 +264,8 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                 }
 
                 AddRelatedIssues(ticket.BacklogItem.RelatedIssues, workItemsAdded, jsonPatchDocument);
+
+                AddRelatedMergeRequestCommits(ticket.BacklogItem.MergeRequests, jsonPatchDocument);
 
                 var workItem = await WorkItemTrackingHttpClient.CreateWorkItemAsync(jsonPatchDocument, AppSettings.AzureDevOps.ProjectName, type);
 
@@ -333,6 +373,31 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
             }
         }
 
+        private void AddRelatedMergeRequestCommits(IEnumerable<MergeRequest> mergeRequests, JsonPatchDocument jsonPatchDocument)
+        {
+            if (ProjectId != null && RepositoryId != null)
+            {
+                foreach (var mergeRequest in mergeRequests.Where(mergeRequest => mergeRequest.State == "merged"))
+                {
+                    jsonPatchDocument.Add(new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/relations/-",
+                        Value = new
+                        {
+                            Rel = "ArtifactLink",
+                            Url = $"vstfs:///Git/Commit/{ProjectId}/{RepositoryId}/{mergeRequest.MergeCommitSha}",
+                            Attributes = new
+                            {
+                                Name = "Fixed in Commit",
+                                Comment = $"Commit from GitLab Merge Request !{mergeRequest.Iid} - {mergeRequest.Title} ({mergeRequest.WebUrl})"
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
         private async Task AddComments(int backlogItemId, int workItemId, IEnumerable<Annotation> annotations, bool isEpic)
         {
             foreach (var annotation in annotations.OrderBy(x => x.Note.CreatedAt))
@@ -342,7 +407,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.AzureDevOps
                     await UploadAttachment(backlogItemId, attachment, isEpic);
                 }
 
-                var comment = await AddComment(backlogItemId, workItemId, isEpic, $"{annotation.Note.CreatedBy} added note on: {annotation.Note.CreatedAt}{Environment.NewLine}{annotation.Note.Body}", annotation.NotesAttachments);
+                var comment = await AddComment(backlogItemId, workItemId, isEpic, $"{annotation.Note.CreatedBy} added note on: {annotation.Note.CreatedAt}{Environment.NewLine}{Environment.NewLine}{annotation.Note.Body}", annotation.NotesAttachments);
 
                 if (comment != null)
                 {

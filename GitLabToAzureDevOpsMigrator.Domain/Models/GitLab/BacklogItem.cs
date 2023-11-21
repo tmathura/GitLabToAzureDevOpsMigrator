@@ -154,5 +154,6 @@ namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
 
         public List<Attachment> DescriptionAttachments { get; set; } = new();
         public List<Issue> RelatedIssues { get; set; } = new();
+        public List<MergeRequest> MergeRequests { get; set; } = new();
     }
 }

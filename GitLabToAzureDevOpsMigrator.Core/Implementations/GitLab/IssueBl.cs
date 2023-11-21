@@ -8,6 +8,7 @@ using log4net;
 using Microsoft.Extensions.Configuration;
 using NGitLab;
 using NGitLab.Models;
+using System.Text.RegularExpressions;
 
 namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
 {
@@ -15,12 +16,13 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
     {
         private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
         private IConsoleHelper ConsoleHelper { get; }
-        public IProjectIssueNoteClient ProjectIssueNoteClient { get; }
-        public IIssueClient IssueClient { get; }
+        private IProjectIssueNoteClient ProjectIssueNoteClient { get; }
+        private IIssueClient IssueClient { get; }
+        private IMergeRequestClient MergeRequestClient { get; }
         private IProjectService ProjectService { get; }
         private GitLabSettings GitLabSettings { get; }
 
-        public IssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IProjectIssueNoteClient projectIssueNoteClient, IIssueClient issueClient, IProjectService projectService)
+        public IssueBl(IConfiguration configuration, IConsoleHelper consoleHelper, IProjectIssueNoteClient projectIssueNoteClient, IIssueClient issueClient, IMergeRequestClient mergeRequestClient, IProjectService projectService)
         {
             var appSettings = new AppSettings();
             configuration.Bind(appSettings);
@@ -30,6 +32,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             ConsoleHelper = consoleHelper;
             ProjectIssueNoteClient = projectIssueNoteClient;
             IssueClient = issueClient;
+            MergeRequestClient = mergeRequestClient;
             ProjectService = projectService;
         }
 
@@ -132,7 +135,7 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
             return processResult;
         }
 
-        private void GetNotes(Issue issue, string projectUrlSegments, Ticket ticket)
+        private async Task GetNotes(Issue issue, string projectUrlSegments, Ticket ticket)
         {
             try
             {
@@ -142,6 +145,27 @@ namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
                 {
                     try
                     {
+                        if (note.Body.Contains("merge request"))
+                        {
+                            // Use a regular expression to match numbers at the end of the string
+                            var match = Regex.Match(note.Body, @"\d+$");
+
+                            // Check if a match is found
+                            if (match.Success && int.TryParse(match.Value, out var mergeRequestId))
+                            {
+                                try
+                                {
+                                    var merge = await MergeRequestClient.GetByIidAsync(mergeRequestId, new SingleMergeRequestQuery());
+
+                                    ticket.BacklogItem.MergeRequests.Add(merge);
+                                }
+                                catch (Exception exception)
+                                {
+                                    Logger.Error($"Error getting GitLab issue !{issue.IssueId} - '{issue.Title}' merge request #{mergeRequestId}.", exception);
+                                }
+                            }
+                        }
+
                         var annotation = new Annotation(new BacklogItemNote<ProjectIssueNote>(note), new List<Attachment>(), null);
 
                         ticket.Annotations.Add(annotation);

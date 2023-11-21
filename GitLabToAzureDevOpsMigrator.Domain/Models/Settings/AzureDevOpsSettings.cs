@@ -5,6 +5,7 @@
         public string Url { get; set; }
         public string AccessToken { get; set; }
         public string ProjectName { get; set; }
+        public string RepositoryName { get; set; }
         public string DefaultIterationPath { get; set; }
     }
 }
