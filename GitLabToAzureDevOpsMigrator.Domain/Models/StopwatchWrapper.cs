@@ -1,27 +1,26 @@
 ﻿using GitLabToAzureDevOpsMigrator.Domain.Interfaces;
 using System.Diagnostics;
 
-namespace GitLabToAzureDevOpsMigrator.Domain.Models
+namespace GitLabToAzureDevOpsMigrator.Domain.Models;
+
+public class StopwatchWrapper : IStopwatchWrapper
 {
-    public class StopwatchWrapper : IStopwatchWrapper
+    private Stopwatch Stopwatch { get; } = new();
+
+    public TimeSpan Elapsed => Stopwatch.Elapsed;
+
+    public void Start()
     {
-        private Stopwatch Stopwatch { get; } = new();
+        Stopwatch.Start();
+    }
 
-        public TimeSpan Elapsed => Stopwatch.Elapsed;
+    public void Stop()
+    {
+        Stopwatch.Stop();
+    }
 
-        public void Start()
-        {
-            Stopwatch.Start();
-        }
-
-        public void Stop()
-        {
-            Stopwatch.Stop();
-        }
-
-        public void Reset()
-        {
-            Stopwatch.Reset();
-        }
+    public void Reset()
+    {
+        Stopwatch.Reset();
     }
 }

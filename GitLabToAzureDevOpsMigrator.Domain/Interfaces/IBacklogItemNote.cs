@@ -1,11 +1,10 @@
 ﻿using NGitLab.Models;
 
-namespace GitLabToAzureDevOpsMigrator.Domain.Interfaces
+namespace GitLabToAzureDevOpsMigrator.Domain.Interfaces;
+
+public interface IBacklogItemNote
 {
-    public interface IBacklogItemNote
-    {
-        DateTime CreatedAt { get; }
-        string CreatedBy { get; }
-        string Body { get; }
-    }
+    DateTime CreatedAt { get; }
+    string CreatedBy { get; }
+    string Body { get; }
 }

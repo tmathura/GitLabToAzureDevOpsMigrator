@@ -1,64 +1,63 @@
 ﻿using GitLabToAzureDevOpsMigrator.Domain.Interfaces;
 using NGitLab.Models;
 
-namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab
+namespace GitLabToAzureDevOpsMigrator.Domain.Models.GitLab;
+
+public class BacklogItemNote<T> : IBacklogItemNote
 {
-    public class BacklogItemNote<T> : IBacklogItemNote
+    public T Note { get; }
+
+    public BacklogItemNote(T note)
     {
-        public T Note { get; }
-
-        public BacklogItemNote(T note)
+        if (note is not ProjectIssueNote && note is not EpicNote.Note)
         {
-            if (note is not ProjectIssueNote && note is not EpicNote.Note)
-            {
-                throw new ArgumentException("Note must be an Epic or Issue.");
-            }
-
-            if (note is null)
-            {
-                throw new ArgumentNullException(nameof(note));
-            }
-
-            Note = note;
+            throw new ArgumentException("Note must be an Epic or Issue.");
         }
 
-        public DateTime CreatedAt
+        if (note is null)
         {
-            get
-            {
-                return Note switch
-                {
-                    ProjectIssueNote projectIssueNote => projectIssueNote.CreatedAt,
-                    EpicNote.Note epicNote => epicNote.CreatedAt,
-                    _ => throw new NotImplementedException()
-                };
-            }
+            throw new ArgumentNullException(nameof(note));
         }
 
-        public string CreatedBy
-        {
-            get
-            {
-                return Note switch
-                {
-                    ProjectIssueNote projectIssueNote => projectIssueNote.Author.Name,
-                    EpicNote.Note epicNote => epicNote.Author.Name,
-                    _ => throw new NotImplementedException()
-                };
-            }
-        }
+        Note = note;
+    }
 
-        public string Body
+    public DateTime CreatedAt
+    {
+        get
         {
-            get
+            return Note switch
             {
-                return Note switch
-                {
-                    ProjectIssueNote projectIssueNote => projectIssueNote.Body,
-                    EpicNote.Note epicNote => epicNote.Body,
-                    _ => throw new NotImplementedException()
-                };
-            }
+                ProjectIssueNote projectIssueNote => projectIssueNote.CreatedAt,
+                EpicNote.Note epicNote => epicNote.CreatedAt,
+                _ => throw new NotImplementedException()
+            };
+        }
+    }
+
+    public string CreatedBy
+    {
+        get
+        {
+            return Note switch
+            {
+                ProjectIssueNote projectIssueNote => projectIssueNote.Author.Name,
+                EpicNote.Note epicNote => epicNote.Author.Name,
+                _ => throw new NotImplementedException()
+            };
+        }
+    }
+
+    public string Body
+    {
+        get
+        {
+            return Note switch
+            {
+                ProjectIssueNote projectIssueNote => projectIssueNote.Body,
+                EpicNote.Note epicNote => epicNote.Body,
+                _ => throw new NotImplementedException()
+            };
         }
     }
 }

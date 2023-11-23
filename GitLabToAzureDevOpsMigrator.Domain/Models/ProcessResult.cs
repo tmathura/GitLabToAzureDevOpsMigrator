@@ -1,8 +1,7 @@
-﻿namespace GitLabToAzureDevOpsMigrator.Domain.Models
+﻿namespace GitLabToAzureDevOpsMigrator.Domain.Models;
+
+public class ProcessResult
 {
-    public class ProcessResult
-    {
-        public int Count { get; set; }
-        public int ErrorCount { get; set; }
-    }
+    public int Count { get; set; }
+    public int ErrorCount { get; set; }
 }

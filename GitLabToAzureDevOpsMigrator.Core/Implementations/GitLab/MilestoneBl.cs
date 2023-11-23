@@ -4,67 +4,65 @@ using GitLabToAzureDevOpsMigrator.Domain.Models;
 using log4net;
 using NGitLab;
 
-namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab
+namespace GitLabToAzureDevOpsMigrator.Core.Implementations.GitLab;
+
+public class MilestoneBl : IMilestoneBl
 {
-    public class MilestoneBl : IMilestoneBl
+    private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
+    private IConsoleHelper ConsoleHelper { get; }
+    private IMilestoneClient MilestoneClient { get; }
+
+    public MilestoneBl(IConsoleHelper consoleHelper, IMilestoneClient milestoneClient)
     {
-        private ILog Logger { get; } = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod()?.DeclaringType);
-        private IConsoleHelper ConsoleHelper { get; }
-        private IMilestoneClient MilestoneClient { get; }
-
-        public MilestoneBl(IConsoleHelper consoleHelper, IMilestoneClient milestoneClient)
-        {
-            ConsoleHelper = consoleHelper;
-            MilestoneClient = milestoneClient;
-        }
+        ConsoleHelper = consoleHelper;
+        MilestoneClient = milestoneClient;
+    }
         
-        public List<Cycle>? Get()
+    public List<Cycle>? Get()
+    {
+        const string startingProcessMessage = "Started getting GitLab milestones.";
+
+        Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
+        Logger.Info(startingProcessMessage);
+
+        try
         {
-            const string startingProcessMessage = "Started getting GitLab milestones.";
+            var milestones = MilestoneClient.All;
 
-            Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
-            Logger.Info(startingProcessMessage);
+            var count = 0;
+            var errorCount = 0;
+            var cycles = new List<Cycle>();
 
-            try
+            foreach (var milestone in milestones)
             {
-                var milestones = MilestoneClient.All;
-
-                var count = 0;
-                var errorCount = 0;
-                var cycles = new List<Cycle>();
-
-                foreach (var milestone in milestones)
+                try
                 {
-                    try
-                    {
-                        count++;
-                        cycles.Add(new Cycle(milestone, null));
+                    count++;
 
-                        ConsoleHelper.DrawConsoleProgressCount(count);
-                    }
-                    catch (Exception exception)
-                    {
-                        errorCount++;
+                    cycles.Add(new Cycle(milestone, null));
 
-                        Logger.Error($"Error getting GitLab milestone #{milestone.Id} - '{milestone.Title}', was on milestone count: {count}.", exception);
-
-                        count--;
-                    }
+                    ConsoleHelper.DrawConsoleProgressCount(count);
                 }
+                catch (Exception exception)
+                {
+                    errorCount++;
 
-                var endingProcessMessage = $"Finished getting GitLab milestones, there were {count} milestones retrieved & there were errors getting {errorCount} milestones.";
-
-                Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
-                Logger.Info(endingProcessMessage);
-
-                return cycles;
+                    Logger.Error($"Error getting GitLab milestone {milestone.Id} - '{milestone.Title}', was on milestone count: {count}.", exception);
+                }
             }
-            catch (Exception exception)
-            {
-                Logger.Error($"Getting GitLab milestones encountered a problem: {exception.Message}", exception);
 
-                return null;
-            }
+            var endingProcessMessage = $"Finished getting GitLab milestones, there were {cycles.Count} milestones retrieved & there were errors getting {errorCount} milestones.";
+
+            Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
+            Logger.Info(endingProcessMessage);
+
+            return cycles;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error($"Getting GitLab milestones encountered a problem: {exception.Message}", exception);
+
+            return null;
         }
     }
 }
