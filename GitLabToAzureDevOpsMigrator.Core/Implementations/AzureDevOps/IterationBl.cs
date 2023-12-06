@@ -71,7 +71,7 @@ public class IterationBl : IIterationBl
                     
                 Logger.Info($"Created {count} Azure DevOp iterations so far, iteration {createdWorkItemClassificationNode.Id} - '{cycle.Milestone.Title}' was just created.");
 
-                ConsoleHelper.DrawConsoleProgressBar(cycles.Count);
+                ConsoleHelper.DrawConsoleProgressBar(count);
             }
             catch (Exception exception)
             {

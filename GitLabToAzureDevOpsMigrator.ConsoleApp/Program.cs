@@ -52,6 +52,7 @@ internal class Program
             .AddSingleton<IMilestoneBl, MilestoneBl>()
             .AddSingleton<IIterationBl, IterationBl>()
             .AddSingleton<ITeamBl, TeamBl>()
+            .AddSingleton<IAreaBl, AreaBl>()
             .AddSingleton<ITeamSettingBl, TeamSettingBl>()
             .AddSingleton<IRestClient, RestClient>(_ => restClient)
             .AddSingleton<IGroupService, GroupService>()

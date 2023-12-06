@@ -16,12 +16,13 @@ public class MigrateBl : IMigrateBl
     private IMilestoneBl MilestoneBl { get; }
     private IIterationBl IterationBl { get; }
     private ITeamBl TeamBl { get; }
+    private IAreaBl AreaBl { get; }
     private ITeamSettingBl TeamSettingBl { get; }
     private IEpicBl EpicBl { get; }
     private IIssueBl IssueBl { get; }
     private IWorkItemBl AzureDevOpsWorkItemBl { get; }
 
-    public MigrateBl(IConfiguration configuration, IProjectBl projectBl, IRepositoryBl repositoryBl, IMilestoneBl milestoneBl, IIterationBl iterationBl, ITeamBl teamBl, ITeamSettingBl teamSettingBl, IEpicBl epicBl, IIssueBl issueBl, IWorkItemBl azureDevOpsWorkItemBl)
+    public MigrateBl(IConfiguration configuration, IProjectBl projectBl, IRepositoryBl repositoryBl, IMilestoneBl milestoneBl, IIterationBl iterationBl, ITeamBl teamBl, IAreaBl areaBl, ITeamSettingBl teamSettingBl, IEpicBl epicBl, IIssueBl issueBl, IWorkItemBl azureDevOpsWorkItemBl)
     {
         configuration.Bind(AppSettings);
 
@@ -30,6 +31,7 @@ public class MigrateBl : IMigrateBl
         MilestoneBl = milestoneBl;
         IterationBl = iterationBl;
         TeamBl = teamBl;
+        AreaBl = areaBl;
         TeamSettingBl = teamSettingBl;
         EpicBl = epicBl;
         IssueBl = issueBl;
@@ -49,6 +51,22 @@ public class MigrateBl : IMigrateBl
         }
 
         var teams = await TeamBl.GetTeams(project.Id);
+
+        var areas = await AreaBl.GetAreas(project.Id);
+
+        if (teams != null && areas != null)
+        {
+            var teamsWithOutCorrectArea = teams.FindAll(team => !areas.Any(area => area.Name.Contains(team.WebApiTeam.Name))).ToList();
+
+            var createdAreas = await AreaBl.Create(project.Id, project.Name, teamsWithOutCorrectArea);
+
+            if (createdAreas is { Count: > 0 })
+            {
+                areas.AddRange(createdAreas);
+            }
+
+            await TeamSettingBl.UpdateAreas(project.Id, teams, areas);
+        }
 
         var team = teams?.FirstOrDefault(x => x.WebApiTeam.Name == AppSettings.AzureDevOps.DefaultTeamName);
 
