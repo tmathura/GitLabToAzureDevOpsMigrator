@@ -56,9 +56,9 @@ public class MigrateBl : IMigrateBl
 
         if (teams != null && areas != null)
         {
-            var teamsWithOutCorrectArea = teams.FindAll(team => !areas.Any(area => area.Name.Contains(team.WebApiTeam.Name))).ToList();
+            var teamsWithoutAreaThatContainsTeamName = teams.FindAll(team => areas.All(area => area.Name != team.WebApiTeam.Name)).ToList();
 
-            var createdAreas = await AreaBl.Create(project.Id, project.Name, teamsWithOutCorrectArea);
+            var createdAreas = await AreaBl.Create(project.Id, project.Name, teamsWithoutAreaThatContainsTeamName);
 
             if (createdAreas is { Count: > 0 })
             {
