@@ -152,7 +152,7 @@ public class WorkItemBl : IWorkItemBl
                 
             if (isEpic)
             {
-                type = "Epic";
+                type = "Feature";
             }
             else if (ticket.BacklogItem.Labels.Contains("bug"))
             {
@@ -282,7 +282,7 @@ public class WorkItemBl : IWorkItemBl
                 });
             }
 
-            AddRelatedIssues(ticket.BacklogItem.RelatedIssues, workItemsAdded, jsonPatchDocument);
+            AddRelatedIssues(ticket.BacklogItem.RelatedIssues, workItemsAdded, jsonPatchDocument, isEpic);
 
             AddRelatedMergeRequestCommits(projectId, repositoryId, ticket.BacklogItem.MergeRequests, jsonPatchDocument);
 
@@ -375,8 +375,15 @@ public class WorkItemBl : IWorkItemBl
         }
     }
 
-    private static void AddRelatedIssues(List<Issue> relatedIssues, IReadOnlyDictionary<int, WorkItem> workItemsAdded, JsonPatchDocument jsonPatchDocument)
+    private static void AddRelatedIssues(List<Issue> relatedIssues, IReadOnlyDictionary<int, WorkItem> workItemsAdded, JsonPatchDocument jsonPatchDocument, bool isEpic)
     {
+        var relationType = "System.LinkTypes.Related";
+        
+        if (isEpic)
+        {
+            relationType = "System.LinkTypes.Hierarchy-Forward";
+        }
+        
         foreach (var relatedIssue in relatedIssues)
         {
             if (workItemsAdded.TryGetValue(relatedIssue.IssueId, out var relatedWorkItem))
@@ -387,7 +394,7 @@ public class WorkItemBl : IWorkItemBl
                     Path = "/relations/-",
                     Value = new
                     {
-                        Rel = "System.LinkTypes.Related",
+                        Rel = relationType,
                         relatedWorkItem.Url
                     }
                 });
