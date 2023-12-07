@@ -69,7 +69,7 @@ public class WorkItemBl : IWorkItemBl
         return workItems;
     }
 
-    public async Task<List<Ticket>?> CreateWorkItems(Guid projectId, Guid repositoryId, List<Cycle>? cycles, List<Ticket>? tickets, List<TeamMember> teamMembers)
+    public async Task<List<Ticket>?> CreateWorkItems(Guid projectId, Guid repositoryId, List<Cycle>? cycles, List<Ticket>? tickets, List<TeamMember> teamMembers, WorkItemClassificationNode? defaultArea)
     {
         var count = 0;
 
@@ -103,10 +103,12 @@ public class WorkItemBl : IWorkItemBl
 
             await semaphore.WaitAsync(); // Wait until the semaphore is available
 
-            tasks.Add(CreateWorkItem(projectId, repositoryId, cycles, ticket, isEpic, workItemsAdded, count, tickets.Count, teamMembers, semaphore));
+            tasks.Add(CreateWorkItem(projectId, repositoryId, cycles, ticket, isEpic, workItemsAdded, count, tickets.Count, teamMembers, defaultArea, semaphore));
         }
 
         var processedResults = await Task.WhenAll(tasks);
+
+        ConsoleHelper.ResetProgressBar();
 
         var processedCount = processedResults.Sum(result => result.Count);
         var errorCount = processedResults.Sum(result => result.ErrorCount);
@@ -119,7 +121,7 @@ public class WorkItemBl : IWorkItemBl
         return tickets;
     }
 
-    private async Task<ProcessResult> CreateWorkItem(Guid projectId, Guid repositoryId, IEnumerable<Cycle>? cycles, Ticket ticket, bool isEpic, ConcurrentDictionary<int, WorkItem> workItemsAdded, int count, int allIssuesCount, List<TeamMember> teamMembers, SemaphoreSlim semaphore)
+    private async Task<ProcessResult> CreateWorkItem(Guid projectId, Guid repositoryId, IEnumerable<Cycle>? cycles, Ticket ticket, bool isEpic, ConcurrentDictionary<int, WorkItem> workItemsAdded, int count, int allIssuesCount, List<TeamMember> teamMembers, WorkItemClassificationNode? defaultArea, SemaphoreSlim semaphore)
     {
         var processResult = new ProcessResult();
 
@@ -189,9 +191,22 @@ public class WorkItemBl : IWorkItemBl
                 }
             };
 
+            if (defaultArea != null)
+            {
+                jsonPatchDocument.Add(new JsonPatchOperation
+                {
+                    Operation = Operation.Add,
+                    Path = "/fields/System.AreaPath",
+                    Value = defaultArea.Path.Replace(@"Area\", string.Empty)
+                });
+            }
+
+            var createdBySet = false;
+            var assignedToSet = false;
+
             foreach (var teamMember in teamMembers)
             {
-                if (teamMember.Identity.DisplayName == ticket.BacklogItem.AuthorName)
+                if (!createdBySet && teamMember.Identity.DisplayName == ticket.BacklogItem.AuthorName)
                 {
                     jsonPatchDocument.Add(new JsonPatchOperation
                     {
@@ -199,9 +214,11 @@ public class WorkItemBl : IWorkItemBl
                         Path = "/fields/System.CreatedBy",
                         Value = ticket.BacklogItem.AuthorName
                     });
+
+                    createdBySet = true;
                 }
 
-                if (teamMember.Identity.DisplayName == ticket.BacklogItem.AssigneeName)
+                if (!assignedToSet && teamMember.Identity.DisplayName == ticket.BacklogItem.AssigneeName)
                 {
                     jsonPatchDocument.Add(new JsonPatchOperation
                     {
@@ -209,8 +226,14 @@ public class WorkItemBl : IWorkItemBl
                         Path = "/fields/System.AssignedTo",
                         Value = ticket.BacklogItem.AssigneeName
                     });
+
+                    assignedToSet = true;
                 }
 
+                if (createdBySet && assignedToSet)
+                {
+                    break;
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(ticket.BacklogItem.MilestoneTitle))

@@ -70,6 +70,8 @@ public class IssueBl : IIssueBl
 
         var processedResults = await Task.WhenAll(tasks);
 
+        ConsoleHelper.ResetProgressBar();
+
         var processedCount = processedResults.Sum(result => result.Count);
         var errorCount = processedResults.Sum(result => result.ErrorCount);
 

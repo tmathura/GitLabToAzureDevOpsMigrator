@@ -100,7 +100,7 @@ public class AreaBl : IAreaBl
 
                 Logger.Info($"Created {count} Azure DevOp areas so far, area {createdWorkItemClassificationNode.Id} - '{team.WebApiTeam.Name}' was just created.");
 
-                ConsoleHelper.DrawConsoleProgressBar(count);
+                ConsoleHelper.DrawConsoleProgressBar(teams.Count);
             }
             catch (Exception exception)
             {
@@ -109,6 +109,8 @@ public class AreaBl : IAreaBl
                 Logger.Error($"Error creating Azure DevOps area for team '{team.WebApiTeam.Name}', was on area count: {count}.", exception);
             }
         }
+
+        ConsoleHelper.ResetProgressBar();
 
         var endingProcessMessage = $"Finished creating Azure DevOps areas, there were {areas.Count} areas created & there were errors creating {errorCount} iterations.";
 

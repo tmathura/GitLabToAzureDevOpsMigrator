@@ -8,4 +8,5 @@ public class AzureDevOpsSettings
     public string RepositoryName { get; set; }
     public string DefaultIterationPath { get; set; }
     public string DefaultTeamName { get; set; }
+    public string DefaultArea { get; set; }
 }

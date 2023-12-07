@@ -62,6 +62,21 @@ public class ConsoleHelper : IConsoleHelper
         }
     }
 
+    public void ResetProgressBar()
+    {
+        if (Monitor.TryEnter(_lock))
+        {
+            try
+            {
+                Progress = 0;
+            }
+            finally
+            {
+                Monitor.Exit(_lock);
+            }
+        }
+    }
+
     private string GetElapsedTime()
     {
         return $"Elapsed Time: {Stopwatch.Elapsed.Hours}{Stopwatch.Elapsed.Minutes}:{Stopwatch.Elapsed.Seconds}:{Stopwatch.Elapsed.Milliseconds}";

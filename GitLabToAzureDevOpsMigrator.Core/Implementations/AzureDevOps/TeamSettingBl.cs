@@ -31,7 +31,7 @@ public class TeamSettingBl : ITeamSettingBl
         var count = 0;
         var errorCount = 0;
 
-        if (cycles == null || cycles.Count == 0)
+        if (cycles == null || cycles.Count == 0 || cycles.Count(cycle => cycle.Iteration != null) == 0)
         {
             const string noCyclesMessage = "Updating Azure DevOps team iterations encountered a problem, no iterations to update from.";
 
@@ -66,7 +66,7 @@ public class TeamSettingBl : ITeamSettingBl
                     Logger.Info($"Updated {count} Azure DevOps team iterations so far, team {webApiTeam.Name} iteration {cycle.Iteration.Id} - '{cycle.Iteration.Name}' was added.");
                 }
 
-                ConsoleHelper.DrawConsoleProgressBar(count);
+                ConsoleHelper.DrawConsoleProgressBar(cycles.Count);
             }
             catch (Exception exception)
             {
@@ -82,6 +82,8 @@ public class TeamSettingBl : ITeamSettingBl
                 }
             }
         }
+
+        ConsoleHelper.ResetProgressBar();
 
         var endingProcessMessage = $"Finished updating Azure DevOps team iterations, there were {count} iterations added to team {webApiTeam.Name} & there were errors creating {errorCount} iterations.";
 
@@ -148,7 +150,7 @@ public class TeamSettingBl : ITeamSettingBl
 
                 }
 
-                ConsoleHelper.DrawConsoleProgressBar(count);
+                ConsoleHelper.DrawConsoleProgressBar(teams.Count);
             }
             catch (Exception exception)
             {
@@ -157,6 +159,8 @@ public class TeamSettingBl : ITeamSettingBl
                 Logger.Error($"Error updating Azure DevOps team {team.WebApiTeam.Name} areas, was on team update count: {count}.", exception);
             }
         }
+
+        ConsoleHelper.ResetProgressBar();
 
         var endingProcessMessage = $"Finished updating Azure DevOps team areas, there were {count} new areas added to the teams & there were errors creating {errorCount} iterations.";
 

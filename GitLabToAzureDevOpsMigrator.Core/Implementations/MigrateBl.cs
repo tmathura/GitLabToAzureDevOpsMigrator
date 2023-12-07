@@ -100,6 +100,8 @@ public class MigrateBl : IMigrateBl
             teamMembers = combinedTeamMembers;
         }
 
-        await AzureDevOpsWorkItemBl.CreateWorkItems(project.Id, repository.Id, cycles, tickets, teamMembers);
+        var defaultArea = areas?.FirstOrDefault(x => x.Name == AppSettings.AzureDevOps.DefaultArea);
+
+        await AzureDevOpsWorkItemBl.CreateWorkItems(project.Id, repository.Id, cycles, tickets, teamMembers, defaultArea);
     }
 }

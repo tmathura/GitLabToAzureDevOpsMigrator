@@ -71,7 +71,7 @@ public class IterationBl : IIterationBl
                     
                 Logger.Info($"Created {count} Azure DevOp iterations so far, iteration {createdWorkItemClassificationNode.Id} - '{cycle.Milestone.Title}' was just created.");
 
-                ConsoleHelper.DrawConsoleProgressBar(count);
+                ConsoleHelper.DrawConsoleProgressBar(cycles.Count);
             }
             catch (Exception exception)
             {
@@ -80,6 +80,8 @@ public class IterationBl : IIterationBl
                 Logger.Error($"Error creating Azure DevOps iteration for milestone {cycle.Milestone.Id} - '{cycle.Milestone.Title}', was on iteration count: {count}.", exception);
             }
         }
+
+        ConsoleHelper.ResetProgressBar();
 
         var endingProcessMessage = $"Finished creating Azure DevOps iterations, there were {cycles.Count(cycle => cycle.Iteration != null)} iterations created & there were errors creating {errorCount} iterations.";
 

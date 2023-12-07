@@ -8,5 +8,5 @@ public interface IWorkItemBl
 {
     Task<WorkItem?> GetWorkItem(string projectName, int id);
     Task<List<WorkItem>> GetWorkItems(string projectName);
-    Task<List<Ticket>?> CreateWorkItems(Guid projectId, Guid repositoryId, List<Cycle>? cycles, List<Ticket>? tickets , List<TeamMember> teamMembers);
+    Task<List<Ticket>?> CreateWorkItems(Guid projectId, Guid repositoryId, List<Cycle>? cycles, List<Ticket>? tickets , List<TeamMember> teamMembers, WorkItemClassificationNode? defaultArea);
 }
