@@ -14,6 +14,7 @@ using Microsoft.VisualStudio.Services.WebApi.Patch;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using NGitLab.Models;
 using RestSharp;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
@@ -90,9 +91,36 @@ public class WorkItemBl : IWorkItemBl
             
         var workItemsAdded = new ConcurrentDictionary<int, WorkItem>();
 
-        var orderedTickets = tickets.OrderBy(ticket => ticket.BacklogItem is BacklogItem<Epic> ? nameof(Epic) : nameof(Issue)).ThenBy(ticket => ticket.BacklogItem.CreatedAt);
+        var orderedEpicTickets = tickets.Where(ticket => ticket.BacklogItem is BacklogItem<Epic>).OrderBy(ticket => ticket.BacklogItem.CreatedAt);
+        var orderedIssueTickets = tickets.Where(ticket => ticket.BacklogItem is BacklogItem<Issue>).OrderBy(ticket => ticket.BacklogItem.CreatedAt);
 
         var semaphore = new SemaphoreSlim(10); // Set the maximum number of parallel tasks
+        
+        var processedIssueResults = await ProcessedTickets(projectId, repositoryId, cycles, tickets, teamMembers, defaultArea, orderedIssueTickets, count, semaphore, workItemsAdded);
+        
+        var processedIssueCount = processedIssueResults.Sum(result => result.Count);
+        var issueErrorCount = processedIssueResults.Sum(result => result.ErrorCount);
+
+        var processedEpicResults = await ProcessedTickets(projectId, repositoryId, cycles, tickets, teamMembers, defaultArea, orderedEpicTickets, count, semaphore, workItemsAdded);
+
+        var processedEpicCount = processedEpicResults.Sum(result => result.Count);
+        var epicErrorCount = processedEpicResults.Sum(result => result.ErrorCount);
+        
+        var processedCount = processedIssueCount + processedEpicCount;
+        var errorCount = issueErrorCount + epicErrorCount;
+
+        ConsoleHelper.ResetProgressBar();
+
+        var endingProcessMessage = $"Finished creating Azure DevOps work items, there were {processedCount} work items created & there were errors creating {errorCount} work items.";
+
+        Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
+        Logger.Info(endingProcessMessage);
+
+        return tickets;
+    }
+
+    private async Task<ProcessResult[]> ProcessedTickets(Guid projectId, Guid repositoryId, IReadOnlyCollection<Cycle>? cycles, ICollection tickets, List<TeamMember> teamMembers, WorkItemClassificationNode? defaultArea, IOrderedEnumerable<Ticket> orderedTickets, int count, SemaphoreSlim semaphore, ConcurrentDictionary<int, WorkItem> workItemsAdded)
+    {
         var tasks = new List<Task<ProcessResult>>();
 
         foreach (var ticket in orderedTickets)
@@ -107,18 +135,8 @@ public class WorkItemBl : IWorkItemBl
         }
 
         var processedResults = await Task.WhenAll(tasks);
-
-        ConsoleHelper.ResetProgressBar();
-
-        var processedCount = processedResults.Sum(result => result.Count);
-        var errorCount = processedResults.Sum(result => result.ErrorCount);
-
-        var endingProcessMessage = $"Finished creating Azure DevOps work items, there were {processedCount} work items created & there were errors creating {errorCount} work items.";
-
-        Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
-        Logger.Info(endingProcessMessage);
-
-        return tickets;
+        
+        return processedResults;
     }
 
     private async Task<ProcessResult> CreateWorkItem(Guid projectId, Guid repositoryId, IEnumerable<Cycle>? cycles, Ticket ticket, bool isEpic, ConcurrentDictionary<int, WorkItem> workItemsAdded, int count, int allIssuesCount, List<TeamMember> teamMembers, WorkItemClassificationNode? defaultArea, SemaphoreSlim semaphore)
@@ -361,7 +379,7 @@ public class WorkItemBl : IWorkItemBl
     {
         foreach (var relatedIssue in relatedIssues)
         {
-            if (workItemsAdded.TryGetValue(relatedIssue.Id, out var relatedWorkItem))
+            if (workItemsAdded.TryGetValue(relatedIssue.IssueId, out var relatedWorkItem))
             {
                 jsonPatchDocument.Add(new JsonPatchOperation
                 {
