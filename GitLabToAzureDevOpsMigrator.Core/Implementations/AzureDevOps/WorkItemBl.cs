@@ -42,9 +42,130 @@ public class WorkItemBl : IWorkItemBl
 
     public async Task<WorkItem?> GetWorkItem(string projectName, int id)
     {
-        var workItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(projectName, new[] { id });
+        var workItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(projectName, new[] { id }, expand: WorkItemExpand.Relations);
 
         return workItems.FirstOrDefault();
+    }
+
+    public async Task FixWorkItemsArtifactLink(Guid projectId, Guid repositoryId)
+    {
+        const string startingProcessMessage = "Started fixing Azure DevOps work items relations";
+
+        Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
+        Logger.Info(startingProcessMessage);
+
+        var workItems = await GetWorkItems(AppSettings.AzureDevOps.ProjectName);
+
+        var numberOfWorkItemsMessage = $"There are {workItems.Count} Azure items to loop through.";
+
+        Console.WriteLine($"{Environment.NewLine}{numberOfWorkItemsMessage}");
+        Logger.Info(numberOfWorkItemsMessage);
+
+        var count = 0;
+        var errorCount = 0;
+
+        foreach (var workItem in workItems)
+        {
+            try
+            {
+                count++;
+
+                await FixWorkItemArtifactLink(workItem, projectId, repositoryId);
+
+                Logger.Info($"Fixed {count} Azure DevOp work items so far, work item #{workItem.Id} was just fixed.");
+
+                ConsoleHelper.DrawConsoleProgressBar(workItems.Count);
+            }
+            catch (Exception exception)
+            {
+                errorCount++;
+
+                Logger.Error($"Error fixing Azure DevOps work item #{workItem.Id}, was on work item count: {count}.", exception);
+            }
+        }
+
+        ConsoleHelper.ResetProgressBar();
+
+        var endingProcessMessage = $"Finished fixing Azure DevOps work items relations, there were {workItems.Count} fixed & there were errors fixing {errorCount} work items.";
+
+        Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
+        Logger.Info(endingProcessMessage);
+    }
+
+    public async Task FixWorkItemArtifactLink(WorkItem workItem, Guid projectId, Guid repositoryId)
+    {
+        if (workItem.Relations == null)
+        {
+            return;
+        }
+
+        var wrongCommitLinkPart = $"{projectId}/{repositoryId}/";
+
+        var artifactIndex = 0;
+        var artifactLinks = new Dictionary<int, WorkItemRelation>();
+
+        foreach (var workItemRelation in workItem.Relations)
+        {
+            workItemRelation.Attributes.TryGetValue("name", out var linkName);
+
+            var isCommitLink = linkName?.ToString() == "Fixed in Commit";
+
+            if (workItemRelation.Rel == "ArtifactLink" && isCommitLink && workItemRelation.Url.Contains(wrongCommitLinkPart))
+            {
+                artifactLinks.Add(artifactIndex, workItemRelation);
+            }
+
+            artifactIndex++;
+        }
+
+        if (!artifactLinks.Any())
+        {
+            return;
+        }
+
+        var correctCommitLinkPart = $"{projectId}%2f{repositoryId}%2f";
+        var patchDocumentAdd = new JsonPatchDocument();
+        var patchDocumentDelete = new JsonPatchDocument();
+
+        foreach (var artifactLink in artifactLinks)
+        {
+            var correctCommitLink = artifactLink.Value.Url.Replace(wrongCommitLinkPart, correctCommitLinkPart);
+            artifactLink.Value.Attributes.TryGetValue("comment", out var comment);
+
+            patchDocumentAdd.Add(new JsonPatchOperation
+            {
+                Operation = Operation.Add,
+                Path = "/relations/-",
+                Value = new
+                {
+                    Rel = "ArtifactLink",
+                    Url = correctCommitLink,
+                    Attributes = new
+                    {
+                        Name = "Fixed in Commit",
+                        Comment = comment
+                    }
+                }
+            });
+
+            patchDocumentDelete.Add(
+                new JsonPatchOperation
+                {
+                    Operation = Operation.Remove,
+                    Path = $"/relations/{artifactLink.Key}"
+                }
+            );
+        }
+
+        if (patchDocumentDelete.Count > 0)
+        {
+            await WorkItemTrackingHttpClient.UpdateWorkItemAsync(patchDocumentDelete, workItem.Id!.Value, bypassRules: true);
+        }
+
+        if (patchDocumentAdd.Count > 0)
+        {
+            await WorkItemTrackingHttpClient.UpdateWorkItemAsync(patchDocumentAdd, workItem.Id!.Value, bypassRules: true);
+        }
     }
 
     public async Task<List<WorkItem>> GetWorkItems(string projectName)
@@ -58,14 +179,55 @@ public class WorkItemBl : IWorkItemBl
         };
 
         var result = await WorkItemTrackingHttpClient.QueryByWiqlAsync(wiql);
-        var ids = result.WorkItems.Select(item => item.Id).ToArray();
+        var ids = result.WorkItems.Select(item => item.Id).ToList();
 
         return await GetWorkItems(projectName, ids);
     }
 
-    private async Task<List<WorkItem>> GetWorkItems(string projectName, IEnumerable<int> ids)
+    private async Task<List<WorkItem>> GetWorkItems(string projectName, List<int> ids)
     {
-        var workItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(projectName, ids);
+        const string startingProcessMessage = "Started getting Azure DevOps work items";
+
+        Console.WriteLine($"{Environment.NewLine}{startingProcessMessage}");
+        Logger.Info(startingProcessMessage);
+
+        var count = 0;
+        var errorCount = 0;
+        var workItems = new List<WorkItem>();
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                count++;
+
+                var responseWorkItems = await WorkItemTrackingHttpClient.GetWorkItemsAsync(projectName, new List<int> { id }, expand: WorkItemExpand.Relations);
+
+                if (responseWorkItems is { Count: > 0 })
+                {
+                    workItems.Add(responseWorkItems[0]);
+                }
+                else
+                {
+                    Logger.Error($"Error getting Azure DevOps work item #{id}, was on work item count: {count}. Response returned null.");
+                }
+
+                ConsoleHelper.DrawConsoleProgressBar(ids.Count);
+            }
+            catch (Exception exception)
+            {
+                errorCount++;
+
+                Logger.Error($"Error getting Azure DevOps work item #{id}, was on work item count: {count}.", exception);
+            }
+        }
+
+        ConsoleHelper.ResetProgressBar();
+
+        var endingProcessMessage = $"Finished getting Azure DevOps work items, there were {workItems.Count} retrieved & there were errors fixing {errorCount} work items.";
+
+        Console.WriteLine($"{Environment.NewLine}{endingProcessMessage}");
+        Logger.Info(endingProcessMessage);
 
         return workItems;
     }
@@ -413,7 +575,7 @@ public class WorkItemBl : IWorkItemBl
                 Value = new
                 {
                     Rel = "ArtifactLink",
-                    Url = $"vstfs:///Git/Commit/{projectId}/{repositoryId}/{mergeRequest.MergeCommitSha}",
+                    Url = $"vstfs:///Git/Commit/{projectId}%2f{repositoryId}%2f{mergeRequest.MergeCommitSha}",
                     Attributes = new
                     {
                         Name = "Fixed in Commit",
